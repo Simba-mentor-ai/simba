@@ -235,8 +235,6 @@ async def on_chat_start():
                 current_url = cl.context.session.http_referer
                 logger.info(f"Got URL from context.session.http_referer: {current_url}")
 
-        otherurl = cl.user_session.get("http_referer")
-        logger.info(f"Other method : {otherurl}")
         if not current_url and hasattr(cl, 'user_session'):
             current_url = cl.user_session.get("http_referer", "")
             logger.info(f"Got URL from user_session: {current_url}")
@@ -356,8 +354,50 @@ async def on_chat_start():
         await cl.Message(content=f"Could not start chat: {str(e)}").send()
         raise
 
+@cl.on_window_message
+async def window_message(message: str):
+    if message.startswith("TrueURL_:"):
+        query_params = {}
+        try :
+            from urllib.parse import urlparse, parse_qs
+            url = message[8:]
+            logger.info(f"received URL : {url}")
+
+            parsed_url = urlparse(url)
+            url_params = parse_qs(parsed_url.query, keep_blank_values=True)
+            
+            for key, value_list in url_params.items():
+                if value_list:
+                    query_params[key] = value_list[0]
+
+            activity_id_str = query_params.get('activity_id')
+            user_id_str = query_params.get('user_id')
+            username = query_params.get('username', 'User')
+            thread_id_str = query_params.get('thread_id')
+            
+            logger.info(f"setting user session with parameters - Activity: {activity_id_str}, User: {user_id_str}, Thread: {thread_id_str}")
+            
+            if activity_id_str:
+                SIMBA_PARAM_STORAGE['activity_id'] = activity_id_str
+                cl.user_session.set("activity_id", activity_id_str)
+            if user_id_str:
+                SIMBA_PARAM_STORAGE['user_id'] = user_id_str
+                cl.user_session.set("user_id", user_id_str)
+            if thread_id_str:
+                SIMBA_PARAM_STORAGE['thread_id'] = thread_id_str
+                cl.user_session.set("thread_id", thread_id_str)
+            if username:
+                SIMBA_PARAM_STORAGE['username'] = username
+                cl.user_session.set("username", username)
+        except Exception as e:
+            logger.error(f"Error during window message reception : {e}")
+            await cl.Message(content=f"Error during window message reception : {str(e)}").send()
+            raise    
+
+
 @cl.on_message
 async def on_message(message: cl.Message):
+
     activity_id = cl.user_session.get("activity_id")
     user_id = cl.user_session.get("user_id")
     username = cl.user_session.get("username", "User")
