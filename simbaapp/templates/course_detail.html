@@ -249,6 +249,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // First clear the iframe
         chainlitFrame.src = 'about:blank';
+        console.log('Sending message :', `${"TrueURL_"}${urlWithTimestamp}`);
         chainlitFrame.contentWindow.postMessage(`${"TrueURL_"}${urlWithTimestamp}`)
         // Wait a moment then load the new URL
         setTimeout(() => {
