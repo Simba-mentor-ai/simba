@@ -223,48 +223,59 @@ Your first message should begin with 'Hello! 😸 I am SIMBA, and I will help yo
 async def on_chat_start():
     
     query_params = {}
-    try:
-        from urllib.parse import urlparse, parse_qs
-        current_url = ""
-        
-        if hasattr(cl, 'context') and hasattr(cl.context, 'session'):
-            if hasattr(cl.context.session, 'root_url'):
-                current_url = cl.context.session.root_url
-                logger.info(f"Got URL from context.session.root_url: {current_url}")
-            elif hasattr(cl.context.session, 'http_referer'):
-                current_url = cl.context.session.http_referer
-                logger.info(f"Got URL from context.session.http_referer: {current_url}")
+    # try:
+    #     from urllib.parse import urlparse, parse_qs
+    #     current_url = ""
 
-        if not current_url and hasattr(cl, 'user_session'):
-            current_url = cl.user_session.get("http_referer", "")
-            logger.info(f"Got URL from user_session: {current_url}")
+    #     if hasattr(cl, 'context') and hasattr(cl.context, 'session'):
+    #         if hasattr(cl.context.session, 'root_url'):
+    #             current_url = cl.context.session.root_url
+    #             logger.info(f"Got URL from context.session.root_url: {current_url}")
+    #         elif hasattr(cl.context.session, 'http_referer'):
+    #             current_url = cl.context.session.http_referer
+    #             logger.info(f"Got URL from context.session.http_referer: {current_url}")
+
+    #     if not current_url and hasattr(cl, 'user_session'):
+    #         current_url = cl.user_session.get("http_referer", "")
+    #         logger.info(f"Got URL from user_session: {current_url}")
         
-        if current_url:
-            parsed_url = urlparse(current_url)
-            url_params = parse_qs(parsed_url.query, keep_blank_values=True)
+    #     if current_url:
+    #         parsed_url = urlparse(current_url)
+    #         url_params = parse_qs(parsed_url.query, keep_blank_values=True)
             
-            for key, value_list in url_params.items():
-                if value_list:
-                    query_params[key] = value_list[0]
+    #         for key, value_list in url_params.items():
+    #             if value_list:
+    #                 query_params[key] = value_list[0]
             
-            logger.info(f"Parsed URL params: {query_params}")
-    except Exception as e:
-        logger.error(f"Error parsing URL parameters: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
+    #         logger.info(f"Parsed URL params: {query_params}")
+    # except Exception as e:
+    #     logger.error(f"Error parsing URL parameters: {e}")
+    #     import traceback
+    #     logger.error(traceback.format_exc())
     
-    if not query_params.get('activity_id') or not query_params.get('user_id'):
-        logger.info("URL parameters incomplete, trying get_simba_params()")
-        simba_params = get_simba_params()
-        logger.info(f"Got SIMBA params: {simba_params}")
-        for key, value in simba_params.items():
-            if key not in query_params or not query_params[key]:
-                query_params[key] = value
+    # if not query_params.get('activity_id') or not query_params.get('user_id'):
+    #     logger.info("URL parameters incomplete, trying get_simba_params()")
+    #     simba_params = get_simba_params()
+    #     logger.info(f"Got SIMBA params: {simba_params}")
+    #     for key, value in simba_params.items():
+    #         if key not in query_params or not query_params[key]:
+    #             query_params[key] = value
         
-    activity_id_str = query_params.get('activity_id')
-    user_id_str = query_params.get('user_id')
-    username = query_params.get('username', 'User')
-    thread_id_str = query_params.get('thread_id')
+    # activity_id_str = query_params.get('activity_id')
+    # user_id_str = query_params.get('user_id')
+    # username = query_params.get('username', 'User')
+    # thread_id_str = query_params.get('thread_id')
+
+    logger.info(f"trying to gather parameters with copilot function")
+
+    activity_id_str = await cl.CopilotFunction(name="url_query_parameter", args={"msg": "activity_id"}).acall()
+    logger.info(f"got activity id : {activity_id_str}")
+    user_id_str = await cl.CopilotFunction(name="url_query_parameter", args={"msg": "user_id"}).acall()
+    logger.info(f"got user id : {user_id_str}")
+    username = await cl.CopilotFunction(name="url_query_parameter", args={"msg": "username"}).acall()
+    logger.info(f"got username : {username}")
+    thread_id_str = await cl.CopilotFunction(name="url_query_parameter", args={"msg": "thread_id"}).acall()
+    logger.info(f"got thread id : {thread_id_str}")
     
     logger.info(f"Final parameters - Activity: {activity_id_str}, User: {user_id_str}, Thread: {thread_id_str}")
     
