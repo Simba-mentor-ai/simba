@@ -221,7 +221,6 @@ Your first message should begin with 'Hello! 😸 I am SIMBA, and I will help yo
 
 @cl.on_chat_start
 async def on_chat_start():
-    print("Chainlit starting new chat session", flush=True)
     
     query_params = {}
     try:
@@ -235,10 +234,18 @@ async def on_chat_start():
             elif hasattr(cl.context.session, 'http_referer'):
                 current_url = cl.context.session.http_referer
                 logger.info(f"Got URL from context.session.http_referer: {current_url}")
+            if hasattr(cl.context.session, 'http_referer'):
+                httpurl = cl.context.session.http_referer
+                logger.info(f"Got URL from context.session.http_referer: {httpurl}")
+
         
         if not current_url and hasattr(cl, 'user_session'):
             current_url = cl.user_session.get("http_referer", "")
             logger.info(f"Got URL from user_session: {current_url}")
+
+        if hasattr(cl, 'user_session'):
+            userUrl = cl.user_session.get("http_referer", "")
+            logger.info(f"Got URL from user_session: {userUrl}")
         
         if current_url:
             parsed_url = urlparse(current_url)
