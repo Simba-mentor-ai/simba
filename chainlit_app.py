@@ -356,6 +356,7 @@ async def on_chat_start():
 
 @cl.on_window_message
 async def window_message(message: str):
+    logger.info(f"received window message : {message}")
     if message.startswith("TrueURL_:"):
         query_params = {}
         try :

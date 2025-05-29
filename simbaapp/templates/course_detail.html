@@ -250,11 +250,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // First clear the iframe
         chainlitFrame.src = 'about:blank';
         console.log('Sending message :', `${"TrueURL_"}${urlWithTimestamp}`);
-        chainlitFrame.contentWindow.postMessage(`${"TrueURL_"}${urlWithTimestamp}`)
         // Wait a moment then load the new URL
         setTimeout(() => {
+            chainlitFrame.contentWindow.postMessage(`${"TrueURL_"}${urlWithTimestamp}`, '*')
+        }, 100);
+        setTimeout(() => {
             chainlitFrame.src = urlWithTimestamp;
-        }, 200); // Increased timeout to 200ms for better clearing
+        }, 100); // Increased timeout to 200ms for better clearing
     }
     
     // Check for expand_activity URL parameter
