@@ -5,7 +5,7 @@ from django.contrib.auth.hashers import make_password, check_password
 from django.utils import timezone
 from django.conf import settings
 from django.db import models
-from .models import User, Course, Activity, Thread, Message, CourseEnrollment, ChainlitSession, InviteToken, ActivityToken, EmailVerificationToken, PasswordResetToken, Event
+from .models import User, Course, Activity, Thread, Message, CourseEnrollment, ChainlitSession, InviteToken, ActivityToken, EmailVerificationToken, PasswordResetToken, Event, DashboardInteraction
 from ninja import Swagger, Router
 from ninja_extra import NinjaExtraAPI
 from ninja_jwt.controller import NinjaJWTDefaultController
@@ -34,6 +34,8 @@ from .schemas import (
     StudentAnalysisSchema,
     WordFrequencySchema,
     RawMessagesSchema,
+    DashboardInteractionLogSchema,
+    RawDashboardDataSchema,
     FileUploadSchema,
     ActivityFileSchema,
     ActivityFilesResponseSchema,
@@ -74,6 +76,8 @@ from django.shortcuts import get_object_or_404
 from http import HTTPStatus
 from . import cluster_students
 from . import openai_assistant
+from . import cognitive_classifier
+from . import cognitive_scores
 from .templates import build_system_prompt
 
 # Configure logging
@@ -855,6 +859,11 @@ def create_message_api(request, thread_id: str, payload: MessageCreateSchema):
             metadata=metadata
         )
 
+        # Classification cognitive temps réel (SIMBA Dashboard Étudiant) —
+        # tourne en tâche de fond, ne bloque jamais la réponse du chat.
+        if payload.role == 'user':
+            cognitive_classifier.classify_message_async(str(message.id))
+
         sentMessage(user, message.id, payload.content, time.time())
         return HTTPStatus.CREATED, message
     except Thread.DoesNotExist:
@@ -1524,6 +1533,51 @@ def get_raw_messages(request, course_id: str = "all", activity_id: str = "all"):
         traceback.print_exc()
         return {"messages": [], "error": str(e)}
 
+@dashboard_router.get("/raw_dashboard_data/", response=RawDashboardDataSchema)
+def get_raw_dashboard_data(request, course_id: str = "all", activity_id: str = "all"):
+    """
+    Export brut des clics sur le dashboard cognitif étudiant, pour l'onglet
+    'Raw Data' du dashboard enseignant. Une ligne par clic : ID étudiant,
+    horodatage, élément cliqué, et les valeurs des indicateurs à ce moment-là.
+    """
+    try:
+        if course_id != "all":
+            course = Course.objects.get(id=course_id)
+            interactions_query = DashboardInteraction.objects.filter(
+                activity__course=course
+            ).select_related('user', 'activity', 'activity__course').order_by('-timestamp')
+        else:
+            interactions_query = DashboardInteraction.objects.all().select_related(
+                'user', 'activity', 'activity__course'
+            ).order_by('-timestamp')
+
+        if activity_id != "all":
+            activity = Activity.objects.get(id=activity_id)
+            interactions_query = interactions_query.filter(activity=activity)
+
+        interactions = []
+        for interaction in interactions_query:
+            interactions.append({
+                'user_id': str(interaction.user_id),
+                'username': interaction.user.username,
+                'timestamp': interaction.timestamp.isoformat(),
+                'element_clicked': interaction.element_clicked,
+                'activity_title': interaction.activity.title if interaction.activity else None,
+                'course_title': interaction.activity.course.title if interaction.activity else None,
+                'reliance': interaction.reliance,
+                'verif_epistemique': interaction.verif_epistemique,
+                'verif_source': interaction.verif_source,
+                'selfeval': interaction.selfeval,
+                'prompt_qual': interaction.prompt_qual,
+            })
+
+        return {"interactions": interactions}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"interactions": [], "error": str(e)}
+
+
 # --- Activity File Management Endpoints ---
 @api.get("/activities/{activity_id}/files", response={200: ActivityFilesResponseSchema, 404: ErrorSchema, 500: ErrorSchema})
 def get_activity_files_api(request, activity_id: str):
@@ -1907,6 +1961,129 @@ def get_chainlit_session(request, session_id: str):
 
 api.add_router("/chainlit", chainlit_router, tags=["Chainlit"])
 api.add_router("/dashboard", dashboard_router, tags=["Dashboard"])
+
+# --- Cognitive Dashboard (SIMBA "Dashboard Étudiant") API Endpoints ---
+student_dashboard_router = Router()
+
+
+@student_dashboard_router.get("/scores/{user_id}/", response={200: dict, 404: ErrorSchema, 400: ErrorSchema})
+def get_student_cognitive_scores(request, user_id: str, activity_id: str = None, course_id: str = None):
+    """
+    Renvoie tous les indicateurs cognitifs calculés en temps réel pour un
+    étudiant (page de détail 'Dashboard Étudiant'). Filtrable par activité
+    ou par cours ; sans filtre, agrège sur l'ensemble des messages classifiés
+    de l'étudiant.
+    """
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return HTTPStatus.NOT_FOUND, {"message": "User not found."}
+
+    activity = None
+    course = None
+    try:
+        if activity_id:
+            activity = Activity.objects.get(id=activity_id)
+        if course_id:
+            course = Course.objects.get(id=course_id)
+    except (Activity.DoesNotExist, Course.DoesNotExist):
+        return HTTPStatus.NOT_FOUND, {"message": "Activity or course not found."}
+
+    scores = cognitive_scores.compute_scores_for_student(user, activity=activity, course=course)
+    percentile = cognitive_scores.compute_class_percentile(user, activity=activity, course=course)
+
+    return HTTPStatus.OK, {
+        "user_id": str(user.id),
+        "username": user.username,
+        "activity_id": str(activity.id) if activity else None,
+        "scores": scores,
+        "class_position": percentile,
+    }
+
+
+@student_dashboard_router.get("/scores/{user_id}/summary/", response={200: dict, 404: ErrorSchema})
+def get_student_cognitive_summary(request, user_id: str, activity_id: str = None):
+    """
+    Version allégée pour le widget toujours-visible du chatbot : seulement les
+    niveaux (good/warn/bad) de 3 indicateurs, jamais les valeurs numériques
+    brutes (cf. décision produit : pas de chiffres dans le widget persistant).
+    """
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return HTTPStatus.NOT_FOUND, {"message": "User not found."}
+
+    activity = None
+    if activity_id:
+        try:
+            activity = Activity.objects.get(id=activity_id)
+        except Activity.DoesNotExist:
+            pass
+
+    scores = cognitive_scores.compute_scores_for_student(user, activity=activity)
+    if not scores["has_data"]:
+        return HTTPStatus.OK, {"has_data": False}
+
+    status = scores["status"]
+    level_rank = {"bad": 0, "warn": 1, "good": 2}
+    ve, vs = status["verif_epistemique"], status["verif_source"]
+    esprit_critique = ve if level_rank[ve["level"]] <= level_rank[vs["level"]] else vs
+
+    return HTTPStatus.OK, {
+        "has_data": True,
+        "N": scores["N"],
+        "autonomie": status["reliance"],
+        "esprit_critique": esprit_critique,
+        "qualite_prompts": status["prompt_qual"],
+    }
+
+
+@student_dashboard_router.post("/log-click/", response={200: dict, 404: ErrorSchema})
+def log_dashboard_click(request, payload: DashboardInteractionLogSchema):
+    """
+    Enregistre un clic étudiant sur le dashboard cognitif (widget ou page de
+    détail), avec les valeurs des indicateurs au moment du clic.
+
+    Les valeurs sont recalculées ici, côté serveur, à partir de
+    cognitive_scores.compute_scores_for_student — jamais transmises telles
+    quelles par le client — pour garantir qu'elles reflètent l'état réel des
+    données au moment du clic plutôt qu'une valeur potentiellement obsolète
+    ou modifiée côté navigateur.
+
+    element_clicked attendu : "dashboard_complet" (lien depuis le widget) ou
+    le code de l'indicateur consulté en détail ("reliance",
+    "verif_epistemique", "verif_source", "selfeval", "prompt_qual").
+    """
+    try:
+        user = User.objects.get(id=payload.user_id)
+    except User.DoesNotExist:
+        return HTTPStatus.NOT_FOUND, {"message": "User not found."}
+
+    activity = None
+    if payload.activity_id:
+        try:
+            activity = Activity.objects.get(id=payload.activity_id)
+        except Activity.DoesNotExist:
+            activity = None
+
+    scores = cognitive_scores.compute_scores_for_student(user, activity=activity)
+    indicators = scores.get("indicators", {}) if scores.get("has_data") else {}
+
+    interaction = DashboardInteraction.objects.create(
+        user=user,
+        activity=activity,
+        element_clicked=payload.element_clicked,
+        reliance=indicators.get("reliance"),
+        verif_epistemique=indicators.get("verif_epistemique"),
+        verif_source=indicators.get("verif_source"),
+        selfeval=indicators.get("selfeval"),
+        prompt_qual=indicators.get("prompt_qual"),
+    )
+
+    return HTTPStatus.OK, {"logged": True, "id": str(interaction.id)}
+
+
+api.add_router("/student-dashboard", student_dashboard_router, tags=["Cognitive Dashboard"])
 
 @api.post("/courses/{course_id}/invite-tokens", response={201: dict, 403: ErrorSchema, 404: ErrorSchema, 500: ErrorSchema})
 def generate_invite_token(request, course_id: str, role: str):

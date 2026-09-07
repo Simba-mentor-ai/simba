@@ -97,7 +97,8 @@ if not Activity.objects.filter(title='Thermodynamics Fundamentals').exists():
         title='Thermodynamics Fundamentals',
         description='Learn the basic principles of thermodynamics',
         course=teacher_course,
-        owner=teacher
+        owner=teacher,
+        ai_model='mistral'
     )
     print('Teacher activity created successfully')
 else:
@@ -110,7 +111,8 @@ if not Activity.objects.filter(title='Research Discussion').exists():
         title='Research Discussion',
         description='Discuss research findings and methodologies',
         course=student_course,
-        owner=student
+        owner=student,
+        ai_model='mistral'
     )
     print('Student activity created successfully')
 else:

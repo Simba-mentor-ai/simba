@@ -1,0 +1,1532 @@
+[
+  {
+    "id": "E-1",
+    "text": "Peux-tu rédiger l'introduction à ma place ?",
+    "expected": {
+      "E": true,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "E-2",
+    "text": "Écris-moi directement la conclusion de la dissertation.",
+    "expected": {
+      "E": true,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "E-3",
+    "text": "Résume ce chapitre pour moi, j'ai la flemme de le lire.",
+    "expected": {
+      "E": true,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "E-4",
+    "text": "Fais le plan détaillé complet à ma place, je le recopierai.",
+    "expected": {
+      "E": true,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "E-5",
+    "text": "Reformule ce paragraphe pour que ça sonne mieux, écris-le entièrement.",
+    "expected": {
+      "E": true,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "I-1",
+    "text": "Comment je devrais structurer mon plan en trois parties ?",
+    "expected": {
+      "E": false,
+      "I": true,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "I-2",
+    "text": "Quelle méthode utiliser pour comparer ces deux pays ?",
+    "expected": {
+      "E": false,
+      "I": true,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "I-3",
+    "text": "Comment tu ferais, toi, pour aborder cette partie du sujet ?",
+    "expected": {
+      "E": false,
+      "I": true,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "I-4",
+    "text": "Est-ce qu'il vaut mieux commencer par les causes économiques ou sociales ?",
+    "expected": {
+      "E": false,
+      "I": true,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "I-5",
+    "text": "Quelle est la meilleure façon de présenter des statistiques dans une dissertation ?",
+    "expected": {
+      "E": false,
+      "I": true,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "V-1",
+    "text": "Non, ce n'est pas ce que j'avais demandé, tu t'es trompé.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": true,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "V-2",
+    "text": "Je crois que cette date est fausse, la révolution industrielle anglaise a commencé plus tôt.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": true,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "V-3",
+    "text": "Cette information est incorrecte, ce n'est pas ce que dit mon cours.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": true,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "V-4",
+    "text": "Attends, tu confonds cause et conséquence dans ta réponse.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": true,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "V-5",
+    "text": "Je ne pense pas que ce chiffre soit le bon, peux-tu vérifier ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": true,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "S-1",
+    "text": "D'où vient cette information exactement ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": true,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "S-2",
+    "text": "Peux-tu me donner tes sources pour cette affirmation ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": true,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "S-3",
+    "text": "Cite-moi l'article ou le livre d'où ça vient stp.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": true,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "S-4",
+    "text": "Comment je peux vérifier que ce que tu dis est vrai ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": true,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "S-5",
+    "text": "Est-ce que ce chiffre vient d'une étude officielle ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": true,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "A-1",
+    "text": "Est-ce que mon introduction fait bien 300 mots ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": true,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "A-2",
+    "text": "Ma structure en trois parties est-elle bien équilibrée ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": true,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "A-3",
+    "text": "Combien de paragraphes j'ai écrits jusqu'ici ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": true,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "A-4",
+    "text": "Est-ce que mon texte respecte bien la limite de deux pages ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": true,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "A-5",
+    "text": "Le nombre de citations que j'ai utilisées est-il suffisant ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": true,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Mb-1",
+    "text": "Je ne comprends pas bien cette partie, tu peux réexpliquer plus simplement ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": true,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Mb-2",
+    "text": "C'est quoi une externalité négative en gros ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": true,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Mb-3",
+    "text": "Je n'ai pas bien saisi la différence entre les deux notions.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": true,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Mb-4",
+    "text": "Est-ce que j'ai bien compris : la crise vient surtout de la surproduction ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": true,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Mb-5",
+    "text": "Peux-tu vérifier si j'ai bien compris le principe de base ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": true,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Md-1",
+    "text": "Si je comprends bien, cette cause agirait aussi en sens inverse, c'est bien ça ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": true,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Md-2",
+    "text": "Est-ce que ce raisonnement tiendrait encore si on change le contexte historique ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": true,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Md-3",
+    "text": "Du coup, ça voudrait dire que les deux phénomènes sont liés bien plus profondément que je pensais ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": true,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Md-4",
+    "text": "Est-ce que cette nuance remet en question toute la partie que j'ai déjà écrite ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": true,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Md-5",
+    "text": "En creusant, est-ce que cette explication contredit celle que tu m'as donnée avant ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": true,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Pb-1",
+    "text": "Mon objectif est d'avoir un plan complet en trois parties pour vendredi.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": true,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Pb-2",
+    "text": "Je veux que mon introduction fasse à peu près une demi-page.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": true,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Pb-3",
+    "text": "Mon but aujourd'hui c'est de finir la partie sur les causes économiques.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": true,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Pb-4",
+    "text": "J'aimerais arriver à un raisonnement clair et bien structuré d'ici ce soir.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": true,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Pb-5",
+    "text": "Ce que je veux, c'est comprendre le sujet avant de commencer à écrire.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": true,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Pp-1",
+    "text": "Le sujet me demande de comparer les causes de la révolution industrielle en France et en Angleterre.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": true,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Pp-2",
+    "text": "Le problème que je dois traiter, c'est l'impact de l'exode rural sur l'urbanisation.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": true,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Pp-3",
+    "text": "En gros, ma question de recherche est : pourquoi cette crise a-t-elle eu lieu à ce moment précis ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": true,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Pp-4",
+    "text": "Ce que je dois démontrer, c'est le lien entre ces deux événements historiques.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": true,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Pp-5",
+    "text": "Le sujet porte sur les conséquences sociales de l'industrialisation.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": true,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Am-1",
+    "text": "En fait laisse-moi reformuler ma question plus précisément : quelles sont les causes démographiques ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": true,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Am-2",
+    "text": "Je vais être plus précis dans ma demande : je veux seulement les causes économiques, pas sociales.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": true,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Am-3",
+    "text": "Pour être plus clair, voici une meilleure version de ma question précédente.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": true,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Am-4",
+    "text": "Je reformule : au lieu de 'explique-moi', je voudrais que tu me poses des questions.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": true,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Am-5",
+    "text": "Attends je précise ma demande initiale, j'étais trop vague.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": true,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Cd-1",
+    "text": "Peux-tu m'expliquer plus en profondeur pourquoi cette cause est considérée comme la plus importante ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": true,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Cd-2",
+    "text": "Est-ce que tu peux développer davantage le lien entre ces deux phénomènes ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": true,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Cd-3",
+    "text": "J'aimerais une explication plus détaillée des mécanismes économiques en jeu.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": true,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Cd-4",
+    "text": "Tu peux approfondir pourquoi cette théorie est contestée par certains historiens ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": true,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Cd-5",
+    "text": "Peux-tu creuser un peu plus la nuance entre ces deux notions proches ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": true,
+      "Cs": false
+    }
+  },
+  {
+    "id": "Cs-1",
+    "text": "Tu peux répéter stp ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": true
+    }
+  },
+  {
+    "id": "Cs-2",
+    "text": "Qu'est-ce que tu veux dire par là ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": true
+    }
+  },
+  {
+    "id": "Cs-3",
+    "text": "Tu peux reformuler ta dernière phrase, j'ai pas compris.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": true
+    }
+  },
+  {
+    "id": "Cs-4",
+    "text": "C'est quoi le mot que tu viens d'utiliser ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": true
+    }
+  },
+  {
+    "id": "Cs-5",
+    "text": "Pardon, tu peux redire ça autrement ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": true
+    }
+  },
+  {
+    "id": "combo-1",
+    "text": "Non ce n'est pas correct, et en plus d'où vient cette affirmation ? Tu as une source ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": true,
+      "S": true,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "combo-2",
+    "text": "Je vais reformuler ma question : comment structurer mon plan en trois parties pour respecter mon objectif de vendredi ?",
+    "expected": {
+      "E": false,
+      "I": true,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": true,
+      "Pp": false,
+      "Am": true,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "combo-3",
+    "text": "Le sujet porte sur l'exode rural, et mon objectif est de finir l'intro ce soir. Comment je m'y prends ?",
+    "expected": {
+      "E": false,
+      "I": true,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": true,
+      "Pp": true,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "combo-4",
+    "text": "Attends, je ne comprends pas bien cette partie, et en creusant, est-ce que ça remettrait en cause tout mon raisonnement ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": true,
+      "Md": true,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "combo-5",
+    "text": "Cette date me semble fausse, tu peux me dire d'où tu la sors ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": true,
+      "S": true,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "combo-6",
+    "text": "Est-ce que mon texte fait bien 300 mots, et est-ce que ma structure en trois parties tient la route ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": true,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "combo-7",
+    "text": "Pour préciser ma demande : peux-tu m'expliquer plus en profondeur le mécanisme économique derrière cette crise ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": true,
+      "Cd": true,
+      "Cs": false
+    }
+  },
+  {
+    "id": "combo-8",
+    "text": "Je ne suis pas sûr d'avoir compris, tu peux répéter simplement ce que tu viens de dire ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": true,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": true
+    }
+  },
+  {
+    "id": "combo-9",
+    "text": "Mon but est de bien cerner le sujet, qui porte sur les conséquences sociales de l'industrialisation. Tu peux m'aider à y voir plus clair ?",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": true,
+      "Pp": true,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "combo-10",
+    "text": "Non, je pense que tu te trompes sur ce point, et j'aimerais que tu développes davantage ton raisonnement.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": true,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": true,
+      "Cs": false
+    }
+  },
+  {
+    "id": "neg-1",
+    "text": "Bonjour, merci pour ton aide !",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "neg-2",
+    "text": "D'accord, je vais faire ça.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "neg-3",
+    "text": "Voici mon texte : l'exode rural a débuté au XIXe siècle avec la mécanisation agricole.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "neg-4",
+    "text": "Ok super, merci beaucoup pour ta réponse.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "neg-5",
+    "text": "Je vais continuer à rédiger ma partie maintenant.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "neg-6",
+    "text": "Très bien, je note ça.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "neg-7",
+    "text": "Ça marche, à plus tard.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "neg-8",
+    "text": "Le sujet parle de l'urbanisation au XIXe siècle en Europe.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "neg-9",
+    "text": "Je continue sur ma lancée, merci.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "neg-10",
+    "text": "Parfait, j'avance bien du coup.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "neg-11",
+    "text": "Ah super, ça m'aide beaucoup pour la suite.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "neg-12",
+    "text": "Je vais passer à la partie suivante maintenant.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "neg-13",
+    "text": "Merci, c'est noté, je continue.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "neg-14",
+    "text": "Je pense avoir fini cette partie, je passe à la suite.",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  },
+  {
+    "id": "neg-15",
+    "text": "Cool, ça me semble clair, merci !",
+    "expected": {
+      "E": false,
+      "I": false,
+      "V": false,
+      "S": false,
+      "A": false,
+      "Mb": false,
+      "Md": false,
+      "Pb": false,
+      "Pp": false,
+      "Am": false,
+      "Cd": false,
+      "Cs": false
+    }
+  }
+]

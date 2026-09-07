@@ -94,7 +94,7 @@ class Activity(models.Model):
     end_date = models.DateTimeField(blank=True, null=True)
     is_visible = models.BooleanField(default=True)
     allow_redo = models.BooleanField(default=True)
-    ai_model = models.CharField(max_length=20, choices=[('gpt', 'GPT'), ('mistral', 'Mistral')], default='gpt')
+    ai_model = models.CharField(max_length=20, choices=[('gpt', 'GPT'), ('mistral', 'Mistral')], default='mistral')
     openai_assistant_id = models.CharField(max_length=255, blank=True, null=True)
     vector_store_id = models.CharField(max_length=255, blank=True, null=True)
     options = models.JSONField(blank=True, null=True, default=dict)
@@ -309,3 +309,37 @@ class ActivityToken(models.Model):
     
     def __str__(self):
         return f"Activity link to {self.activity.title} in {self.activity.course.title}"
+
+
+class DashboardInteraction(models.Model):
+    """
+    SIMBA — journal des clics sur le dashboard cognitif étudiant.
+    Une ligne est créée à chaque fois qu'un étudiant ouvre le dashboard complet
+    depuis le widget à côté du chatbot, ou consulte le détail d'un indicateur
+    (bouton "i") sur la page de détail. Les valeurs des indicateurs sont
+    recalculées côté serveur au moment du clic (jamais transmises par le
+    client), pour garantir qu'elles reflètent l'état réel des données.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="dashboard_interactions")
+    activity = models.ForeignKey(Activity, on_delete=models.SET_NULL, null=True, blank=True, related_name="dashboard_interactions")
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    # Élément cliqué : "dashboard_complet" (lien depuis le widget) ou le code
+    # de l'indicateur consulté en détail ("reliance", "verif_epistemique",
+    # "verif_source", "selfeval", "prompt_qual").
+    element_clicked = models.CharField(max_length=100)
+
+    # Valeurs des indicateurs au moment du clic (None si pas encore calculables,
+    # ex. aucun message classifié pour cet étudiant sur cette activité).
+    reliance = models.FloatField(null=True, blank=True)
+    verif_epistemique = models.FloatField(null=True, blank=True)
+    verif_source = models.FloatField(null=True, blank=True)
+    selfeval = models.FloatField(null=True, blank=True)
+    prompt_qual = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-timestamp"]
+
+    def __str__(self):
+        return f"{self.user} a cliqué sur '{self.element_clicked}' à {self.timestamp}"

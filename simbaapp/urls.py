@@ -24,6 +24,7 @@ urlpatterns = [
     path('activities/', views.activities_view, name='activities'),
     path('dashboard/', views.dashboard_view, name='dashboard'),
     path('chainlit/', views.chainlit_view, name='chainlit'),
+    path('cognitive-dashboard/', views.student_cognitive_dashboard_view, name='student_cognitive_dashboard'),
     path('api/', api.urls),
     
     # Admin URLs

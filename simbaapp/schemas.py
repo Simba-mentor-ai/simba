@@ -91,7 +91,7 @@ class ActivityCreateSchema(Schema):
     end_date: Optional[datetime] = None
     is_visible: bool = True
     allow_redo: bool = True
-    ai_model: str = 'gpt'
+    ai_model: str = 'mistral'
     files: List[str] = Field(default_factory=list)
     options: Optional[Dict[str, Any]] = None
     # For backward compatibility, also accept individual fields
@@ -114,7 +114,7 @@ class ActivityUpdateSchema(Schema):
     end_date: Optional[datetime] = None
     is_visible: Optional[bool] = True
     allow_redo: Optional[bool] = True
-    ai_model: Optional[str] = 'gpt'
+    ai_model: Optional[str] = 'mistral'
     files: Optional[List[str]] = Field(default_factory=list)
     options: Optional[Dict[str, Any]] = None
     questions: Optional[List[str]] = Field(default_factory=list)
@@ -275,6 +275,14 @@ class WordFrequencySchema(Schema):
 
 class RawMessagesSchema(Schema):
     messages: list
+
+class DashboardInteractionLogSchema(Schema):
+    user_id: str
+    activity_id: str = None
+    element_clicked: str
+
+class RawDashboardDataSchema(Schema):
+    interactions: list
 
 class FileUploadSchema(Schema):
     filename: str

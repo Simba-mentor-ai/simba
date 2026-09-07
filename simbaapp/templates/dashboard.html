@@ -1141,6 +1141,50 @@
 </table>
     </div>
   </div>
+
+  <!-- SIMBA — Raw Data du dashboard cognitif : un clic étudiant par ligne -->
+  <div class="chart-container">
+    <h3>{% trans 'Dashboard Cognitif — Raw Data' %}</h3>
+    <div style="margin-bottom: 10px; text-align: right;">
+      <button id="export-dashboard-csv" class="btn-generate">{% trans 'Export to CSV' %}</button>
+    </div>
+    <div style="max-height: 400px; overflow: auto;">
+      <table class="engagement-table" id="dashboard-raw-data-table">
+  <thead>
+    <tr>
+      <th>{% trans 'Student ID' %}</th>
+      <th>{% trans 'Username' %}</th>
+      <th>{% trans 'Timestamp' %}</th>
+      <th>{% trans 'Element Clicked' %}</th>
+      <th>{% trans 'Reliance' %}</th>
+      <th>{% trans 'Epistemic Vigilance' %}</th>
+      <th>{% trans 'Source Verification' %}</th>
+      <th>{% trans 'SelfEval' %}</th>
+      <th>{% trans 'Prompt Quality' %}</th>
+    </tr>
+  </thead>
+  <tbody>
+          {% for interaction in raw_dashboard_interactions %}
+      <tr>
+        <td>{{ interaction.user_id }}</td>
+        <td>{{ interaction.user.username }}</td>
+        <td>{{ interaction.timestamp }}</td>
+        <td>{{ interaction.element_clicked }}</td>
+        <td>{{ interaction.reliance|default_if_none:"—" }}</td>
+        <td>{{ interaction.verif_epistemique|default_if_none:"—" }}</td>
+        <td>{{ interaction.verif_source|default_if_none:"—" }}</td>
+        <td>{{ interaction.selfeval|default_if_none:"—" }}</td>
+        <td>{{ interaction.prompt_qual|default_if_none:"—" }}</td>
+      </tr>
+    {% empty %}
+          <tr>
+            <td colspan="9">{% trans 'No dashboard interactions available' %}</td>
+          </tr>
+    {% endfor %}
+  </tbody>
+</table>
+    </div>
+  </div>
   
   <div class="chart-container">
     <h3>{% trans 'Conversation Statistics' %}</h3>
@@ -2458,6 +2502,65 @@
       document.body.removeChild(link);
     }
   });
+
+  // Export Dashboard Cognitif Raw Data to CSV
+  const exportDashboardBtn = document.getElementById('export-dashboard-csv');
+  if (exportDashboardBtn) {
+    exportDashboardBtn.addEventListener('click', function() {
+      const courseId = document.getElementById('course-filter').value;
+      const activityId = document.getElementById('activity-filter') ? document.getElementById('activity-filter').value : 'all';
+      const spinner = document.createElement('div');
+      spinner.className = 'spinner';
+      spinner.style.display = 'block';
+      exportDashboardBtn.parentElement.appendChild(spinner);
+
+      function downloadDashboardCSV(csvContent) {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `simba_dashboard_raw_data_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      fetch(`/api/dashboard/raw_dashboard_data/?course_id=${courseId}&activity_id=${activityId || 'all'}`)
+        .then(response => response.json())
+        .then(data => {
+          const headers = ['Student ID', 'Username', 'Timestamp', 'Element Clicked', 'Course', 'Activity', 'Reliance', 'Epistemic Vigilance', 'Source Verification', 'SelfEval', 'Prompt Quality'];
+          const rows = (data.interactions || []).map(i => [
+            `"${i.user_id || ''}"`,
+            `"${i.username || ''}"`,
+            `"${i.timestamp || ''}"`,
+            `"${i.element_clicked || ''}"`,
+            `"${i.course_title || ''}"`,
+            `"${i.activity_title || ''}"`,
+            i.reliance ?? '',
+            i.verif_epistemique ?? '',
+            i.verif_source ?? '',
+            i.selfeval ?? '',
+            i.prompt_qual ?? '',
+          ]);
+
+          if (rows.length === 0) {
+            alert(gettext('No data available to export'));
+            spinner.remove();
+            return;
+          }
+
+          const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+          downloadDashboardCSV(csvContent);
+          spinner.remove();
+        })
+        .catch(error => {
+          console.error('Error fetching raw dashboard data:', error);
+          alert(gettext('An error occurred while exporting data. Please try again.'));
+          spinner.remove();
+        });
+    });
+  }
   
   async function getUserIdByUsername(username) {
     try {

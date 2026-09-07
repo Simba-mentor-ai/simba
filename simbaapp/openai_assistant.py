@@ -2,7 +2,7 @@ import os
 import base64
 import tempfile
 from datetime import datetime
-from openai import OpenAI
+from openai import OpenAI, NotFoundError
 from typing import List, Dict, Any, Optional
 import logging
 from .templates import build_system_prompt
@@ -199,7 +199,8 @@ def create_assistant(activity_data: Dict[str, Any], files: List[Dict[str, Any]] 
         }
         
     except Exception as e:
-        logger.error(f"Error creating OpenAI assistant: {str(e)}")
+        detail = getattr(e, 'body', None) or getattr(e, 'message', None) or str(e)
+        logger.error(f"Error creating OpenAI assistant: {str(e)} | detail={detail}")
         return {
             'assistant_id': None,
             'vector_store_id': None,
@@ -211,7 +212,19 @@ def update_assistant(assistant_id: str, activity_data: Dict[str, Any], files: Li
     """Update an existing OpenAI assistant"""
     try:
         assistant = client.beta.assistants.retrieve(assistant_id)
+    except NotFoundError:
+        # L'assistant stocké en base n'existe plus sous la clé API actuellement
+        # configurée (clé changée/tournée entre environnements, ou assistant
+        # supprimé côté OpenAI). Plutôt que d'échouer la mise à jour, on
+        # recrée un assistant neuf avec les mêmes réglages, et on renvoie son
+        # nouvel id pour que l'appelant (update_activity_api) le sauvegarde.
+        logger.warning(
+            f"OpenAI assistant {assistant_id} introuvable (404) sous la clé API "
+            f"actuelle — recréation d'un nouvel assistant pour cette activité."
+        )
+        return create_assistant(activity_data, files, language)
 
+    try:
         vector_store_id = None
         if hasattr(assistant.tool_resources, 'file_search') and assistant.tool_resources.file_search:
             if assistant.tool_resources.file_search.vector_store_ids:
@@ -277,8 +290,18 @@ def update_assistant(assistant_id: str, activity_data: Dict[str, Any], files: Li
             'success': True
         }
         
+    except NotFoundError:
+        # Le retrieve() initial a réussi mais l'update() échoue en 404 (rare,
+        # ex. assistant supprimé entre les deux appels) — même filet de
+        # sécurité : on recrée plutôt que d'échouer.
+        logger.warning(
+            f"OpenAI assistant {assistant_id} disparu pendant la mise à jour — "
+            f"recréation d'un nouvel assistant pour cette activité."
+        )
+        return create_assistant(activity_data, files, language)
     except Exception as e:
-        logger.error(f"Error updating OpenAI assistant: {str(e)}")
+        detail = getattr(e, 'body', None) or getattr(e, 'message', None) or str(e)
+        logger.error(f"Error updating OpenAI assistant: {str(e)} | detail={detail}")
         return {
             'assistant_id': None,
             'vector_store_id': None,
@@ -404,4 +427,4 @@ def upload_file_to_assistant(vector_store_id: str, file_data: Dict[str, Any]) ->
         return {
             'success': False,
             'error': str(e)
-        } 
+        }

@@ -328,6 +328,7 @@ async def on_chat_start():
     
     if not session_data:
         logger.warning("No pending sessions found after all retry attempts")
+        cl.user_session.set("session_ready", False)
         await cl.Message(content="No chat session is currently available. Please try starting a new chat from the course page.").send()
         return
     
@@ -351,6 +352,7 @@ async def on_chat_start():
     cl.user_session.set("thread_id", thread_id)
     cl.user_session.set("language", language_code)
     cl.user_session.set("activity_data", activity_data)
+    cl.user_session.set("session_ready", True)
 
     try:    
         previous_messages_data = await api_get_messages_for_thread(thread_id)
@@ -440,10 +442,22 @@ async def on_message(message: cl.Message):
     
     logger.info(f"Parameters for message - Activity: {activity_id}, User: {user_id}, Thread: {thread_id}, Session: {session_id}")
 
-    if not all([activity_id, user_id, thread_id, activity_data]):
-        logger.error(f"Missing required parameters - Activity: {activity_id}, User: {user_id}, Thread: {thread_id}")
-        await cl.Message(content="Session error. Please refresh and try again.").send()
+    if not cl.user_session.get("session_ready", False):
+        logger.warning("Ignoring message because no Chainlit session was initialized")
         return
+
+    if not all([activity_id, user_id, thread_id, activity_data]):
+        logger.error(f"Invalid Chainlit session - Activity: {activity_id}, User: {user_id}, Thread: {thread_id}")
+        await cl.Message(content="Session error. Please start the chat again from the course page.").send()
+        return
+
+    # SIMBA — Indicateur "en train de réfléchir" : on envoie tout de suite un
+    # message vide (Chainlit l'affiche avec son animation de frappe intégrée),
+    # puis on le met à jour avec la vraie réponse une fois prête, plutôt que de
+    # laisser l'écran vide pendant tout le temps de génération (jusqu'à 30s
+    # dans le cas de l'OpenAI Assistant API ci-dessous).
+    thinking_msg = cl.Message(content="")
+    await thinking_msg.send()
 
     try:
         await api_create_message(thread_id, message.content, "user", user_id, username=username)
@@ -473,11 +487,13 @@ async def on_message(message: cl.Message):
                 ai_response_content = response.choices[0].message.content
                 
                 await api_create_message(thread_id, ai_response_content, "assistant", user_id, model_name=mistral_settings["model"])
-                await cl.Message(content=ai_response_content).send()
+                thinking_msg.content = ai_response_content
+                await thinking_msg.update()
                 
             except Exception as e:
                 logger.error(f"Mistral AI Error: {e}")
-                await cl.Message(content=f"I apologize, but I'm having trouble processing your request right now. Please try again in a moment. Error: {str(e)}").send()
+                thinking_msg.content = f"I apologize, but I'm having trouble processing your request right now. Please try again in a moment. Error: {str(e)}"
+                await thinking_msg.update()
         
         else:
             openai_assistant_id = activity_data.get('openai_assistant_id')
@@ -543,27 +559,34 @@ async def on_message(message: cl.Message):
                                 
                                 await api_create_message(thread_id, ai_response_content, "assistant", user_id, model_name="gpt-4o-mini")
                                 
-                                await cl.Message(content=ai_response_content).send()
+                                thinking_msg.content = ai_response_content
+                                await thinking_msg.update()
                                 logger.info(f"Assistant response sent successfully")
                             else:
                                 logger.error("Assistant message has no content")
-                                await cl.Message(content="I apologize, but I couldn't generate a response. Please try again.").send()
+                                thinking_msg.content = "I apologize, but I couldn't generate a response. Please try again."
+                                await thinking_msg.update()
                         else:
                             logger.error("No messages returned from assistant")
-                            await cl.Message(content="I apologize, but I couldn't retrieve the response. Please try again.").send()
+                            thinking_msg.content = "I apologize, but I couldn't retrieve the response. Please try again."
+                            await thinking_msg.update()
                     elif run.status == 'failed':
                         logger.error(f"OpenAI run failed: {run.last_error}")
-                        await cl.Message(content="I apologize, but I encountered an error processing your request. Please try again.").send()
+                        thinking_msg.content = "I apologize, but I encountered an error processing your request. Please try again."
+                        await thinking_msg.update()
                     elif attempts >= max_attempts:
                         logger.error(f"OpenAI run timed out after {max_attempts} seconds")
-                        await cl.Message(content="I apologize, but the request is taking too long. Please try again.").send()
+                        thinking_msg.content = "I apologize, but the request is taking too long. Please try again."
+                        await thinking_msg.update()
                     else:
                         logger.error(f"OpenAI run failed with status: {run.status}")
-                        await cl.Message(content="I apologize, but I encountered an error processing your request. Please try again.").send()
+                        thinking_msg.content = "I apologize, but I encountered an error processing your request. Please try again."
+                        await thinking_msg.update()
                         
                 except Exception as e:
                     logger.error(f"OpenAI Assistant API Error: {e}")
-                    await cl.Message(content=f"I apologize, but I'm having trouble processing your request right now. Please try again in a moment. Error: {str(e)}").send()
+                    thinking_msg.content = f"I apologize, but I'm having trouble processing your request right now. Please try again in a moment. Error: {str(e)}"
+                    await thinking_msg.update()
                     
             else:
                 logger.info("No OpenAI assistant available - using legacy chat completions mode")
@@ -586,10 +609,11 @@ async def on_message(message: cl.Message):
                 ai_response_content = response.choices[0].message.content
                 
                 await api_create_message(thread_id, ai_response_content, "assistant", user_id, model_name=openai_settings["model"])
-                await cl.Message(content=ai_response_content).send()
+                thinking_msg.content = ai_response_content
+                await thinking_msg.update()
                 logger.info("Legacy chat completion response sent successfully")
         
     except Exception as e:
         logger.error(f"Error processing message: {e}")
-        await cl.Message(content=f"An error occurred: {str(e)}").send()
-
+        thinking_msg.content = f"An error occured: {str(e)}"
+        await thinking_msg.update()

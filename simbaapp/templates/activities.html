@@ -132,41 +132,230 @@
     
     <!-- Chainlit Container -->
     <div id="chainlit-container" class="chainlit-container">
-        <div class="chainlit-header">
-            <div class="header-left">
-                <div class="back-link">
-                    <a href="#" id="back-to-activities">
-                        <i class="fas fa-arrow-left"></i> <span class="back-text">{% trans 'Back to Activities' %}</span>
-                    </a>
+        <!-- SIMBA — Dashboard cognitif : panneau permanent à gauche du chat -->
+        <div id="simba-cog-sidebar">
+            <div class="simba-cog-sidebar-header">
+                <h4>Ton profil d'utilisation de l'IA</h4>
+                <div class="subtitle">Mis à jour en temps réel</div>
+            </div>
+            <div id="simba-cog-body" class="simba-cog-sidebar-body">
+                <div class="simba-empty">Continue la conversation pour voir apparaître ton profil ici.</div>
+            </div>
+            <a class="simba-cta" id="simba-cog-link" href="#" target="_blank" rel="noopener">Voir le dashboard complet →</a>
+        </div>
+
+        <div id="chainlit-main-column" class="chainlit-main-column">
+            <div class="chainlit-header">
+                <div class="header-left">
+                    <div class="back-link">
+                        <a href="#" id="back-to-activities">
+                            <i class="fas fa-arrow-left"></i> <span class="back-text">{% trans 'Back to Activities' %}</span>
+                        </a>
+                    </div>
                 </div>
-            </div>
-            <div class="header-center">
-                <h3 id="activity-title-header"></h3>
-            </div>
-            <div class="header-right">
-                <div class="redo-controls" style="display: none;">
-                    <button class="btn btn-secondary redo-activity-btn" id="chainlit-redo-btn">
-                        <i class="fas fa-redo"></i> <span class="redo-text">{% trans 'Re-do Activity' %}</span>
-                    </button>
-                    <div class="attempt-dropdown" id="chainlit-attempt-dropdown" style="display: none;">
-                        <select class="form-control attempt-selector" id="chainlit-attempt-selector">
-                            <option value="new">{% trans 'Start New Attempt' %}</option>
-                        </select>
-                        <button class="btn btn-primary start-attempt-btn" id="chainlit-start-btn">
-                            {% trans 'Start' %}
+                <div class="header-center">
+                    <h3 id="activity-title-header"></h3>
+                </div>
+                <div class="header-right">
+                    <div class="redo-controls" style="display: none;">
+                        <button class="btn btn-secondary redo-activity-btn" id="chainlit-redo-btn">
+                            <i class="fas fa-redo"></i> <span class="redo-text">{% trans 'Re-do Activity' %}</span>
                         </button>
-                        <button class="btn btn-secondary cancel-attempt-btn" id="chainlit-cancel-btn">
-                            {% trans 'Cancel' %}
-                        </button>
+                        <div class="attempt-dropdown" id="chainlit-attempt-dropdown" style="display: none;">
+                            <select class="form-control attempt-selector" id="chainlit-attempt-selector">
+                                <option value="new">{% trans 'Start New Attempt' %}</option>
+                            </select>
+                            <button class="btn btn-primary start-attempt-btn" id="chainlit-start-btn">
+                                {% trans 'Start' %}
+                            </button>
+                            <button class="btn btn-secondary cancel-attempt-btn" id="chainlit-cancel-btn">
+                                {% trans 'Cancel' %}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        <div class="chainlit-frame-container">
-            <iframe id="chainlit-frame" frameborder="0"></iframe>
+            <div class="chainlit-frame-container">
+                <iframe id="chainlit-frame" frameborder="0"></iframe>
+            </div>
         </div>
     </div>
 </div>
+
+<!-- ══════════════ SIMBA — Dashboard cognitif : styles + logique du panneau ══════════════ -->
+<style>
+    .chainlit-main-column {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-width: 0;
+        height: 100%;
+    }
+    #simba-cog-sidebar {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        max-height: 240px;
+        overflow-y: auto;
+        border-bottom: 1px solid var(--border-color, #aaaaaa);
+        background: #ffffff;
+        padding: 14px 16px;
+        box-sizing: border-box;
+        font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+        color: var(--text-color, #333333);
+        flex-shrink: 0;
+    }
+    .simba-cog-sidebar-header h4 {
+        margin: 0 0 2px 0; font-size: 0.92rem; color: var(--primary-color, #d64000);
+        font-weight: 700;
+    }
+    .simba-cog-sidebar-header .subtitle {
+        font-size: 0.66rem; color: #888888; margin-bottom: 10px;
+    }
+    .simba-cog-sidebar-body { flex: 1; }
+    .simba-cursor-block { margin-bottom: 10px; }
+    .simba-cursor-label {
+        font-size: 0.7rem; font-weight: 600; color: #555555;
+        text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
+    }
+    .simba-cursor-track {
+        position: relative; height: 8px; border-radius: 4px;
+        background: linear-gradient(90deg, #C0392B 0%, #E0A526 50%, #2E7D5E 100%);
+        opacity: 0.45; margin-bottom: 4px;
+    }
+    .simba-cursor-marker {
+        position: absolute; top: -3px; width: 14px; height: 14px;
+        border-radius: 50%; background: #fff; border: 2px solid #ffffff;
+        box-shadow: 0 0 0 2px currentColor, 0 1px 4px rgba(0,0,0,0.25);
+        transform: translateX(-50%);
+    }
+    .simba-info-box {
+        font-size: 0.71rem; line-height: 1.4; color: #555555;
+        background: var(--hover-color, #f8f8f8); border-radius: 8px; padding: 6px 9px;
+    }
+    .simba-definition-box {
+        font-size: 0.68rem; line-height: 1.45; color: #666666;
+        background: #ffffff; border: 1px solid var(--border-color, #e0e0e0);
+        border-radius: 8px; padding: 6px 9px; margin-top: 4px;
+    }
+    #simba-cog-sidebar .simba-cta {
+        display: block; text-align: center; margin-top: 4px;
+        font-size: 0.74rem; font-weight: 600; color: var(--primary-color, #d64000);
+        text-decoration: none; padding: 8px; border-radius: 4px;
+        border: 1px solid var(--border-color, #aaaaaa); background: #ffffff;
+        flex-shrink: 0;
+    }
+    #simba-cog-sidebar .simba-cta:hover { background: var(--hover-color, #f8f8f8); color: var(--primary-dark, #ac3300); }
+    #simba-cog-sidebar .simba-empty { font-size: 0.76rem; color: #888888; }
+
+    @media (min-width: 769px) {
+        #chainlit-container.active {
+            flex-direction: row !important;
+        }
+        #simba-cog-sidebar {
+            width: 280px;
+            max-height: none;
+            height: 100%;
+            border-bottom: none;
+            border-right: 1px solid var(--border-color, #aaaaaa);
+            overflow-y: auto;
+        }
+    }
+</style>
+
+<script>
+(function () {
+    const LEVEL_COLOR = { good: '#2E7D5E', warn: '#D4820A', bad: '#C0392B' };
+    const LEVEL_POS   = { bad: 14, warn: 50, good: 86 };
+    const SIMBA_USER_ID = '{{ request.session.user_id }}';
+
+    const INDICATOR_DEFINITIONS = {
+        autonomie: "Indique si tu demandes à l'IA de faire le travail à ta place, ou plutôt de t'expliquer comment faire toi-même. Rester autonome t'aide à mieux apprendre.",
+        esprit_critique: "Indique si tu vérifies ce que dit l'IA : corriges-tu ses erreurs ? Lui demandes-tu ses sources ? Une IA peut se tromper, la questionner est important.",
+        qualite_prompts: "Indique si tu reformules tes questions pour obtenir de meilleures réponses, plutôt que de garder toujours la même formulation.",
+    };
+
+    function apiBase() {
+        return window.location.origin + '/api';
+    }
+
+    function cursorHtml(label, statusObj, definitionText) {
+        if (!statusObj) return '';
+        const color = LEVEL_COLOR[statusObj.level] || '#7A9BBF';
+        const pos = LEVEL_POS[statusObj.level] ?? 50;
+        return `
+            <div class="simba-cursor-block">
+                <div class="simba-cursor-label">${label}</div>
+                <div class="simba-cursor-track">
+                    <div class="simba-cursor-marker" style="left:${pos}%; color:${color};"></div>
+                </div>
+                <div class="simba-info-box">${statusObj.text}</div>
+                <div class="simba-definition-box">${definitionText || ''}</div>
+            </div>`;
+    }
+
+    window.simbaRefreshCogWidget = async function () {
+        try {
+            const userId = SIMBA_USER_ID;
+            const activityId = window.currentActivity ? window.currentActivity.id : null;
+            if (!userId || !activityId) return;
+
+            const link = document.getElementById('simba-cog-link');
+            link.href = `/cognitive-dashboard/?user_id=${userId}&activity_id=${activityId}`;
+
+            const url = `${apiBase()}/student-dashboard/scores/${userId}/summary/?activity_id=${activityId}`;
+            const res = await fetch(url);
+            if (!res.ok) return;
+            const data = await res.json();
+            const body = document.getElementById('simba-cog-body');
+
+            if (!data.has_data) {
+                body.innerHTML = '<div class="simba-empty">Continue la conversation pour voir apparaître ton profil ici.</div>';
+                return;
+            }
+
+            body.innerHTML =
+                cursorHtml('Autonomie face à l’IA', data.autonomie, INDICATOR_DEFINITIONS.autonomie) +
+                cursorHtml('Esprit critique', data.esprit_critique, INDICATOR_DEFINITIONS.esprit_critique) +
+                cursorHtml('Qualité de tes prompts', data.qualite_prompts, INDICATOR_DEFINITIONS.qualite_prompts);
+        } catch (e) {
+            console.warn('SIMBA cognitive dashboard: refresh failed', e);
+        }
+    };
+
+    setInterval(function () {
+        if (document.getElementById('chainlit-container').classList.contains('active')) {
+            window.simbaRefreshCogWidget();
+        }
+    }, 12000);
+
+    // SIMBA — journal des clics sur le dashboard cognitif (raw data enseignant).
+    window.simbaLogDashboardClick = function (elementClicked) {
+        const userId = SIMBA_USER_ID;
+        const activityId = window.currentActivity ? window.currentActivity.id : null;
+        if (!userId) return;
+        fetch(`${apiBase()}/student-dashboard/log-click/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId, activity_id: activityId, element_clicked: elementClicked }),
+        }).catch(e => console.warn('SIMBA dashboard click log failed', e));
+    };
+
+    function attachDashboardLinkLogger() {
+        const link = document.getElementById('simba-cog-link');
+        if (link) {
+            link.addEventListener('click', function () {
+                window.simbaLogDashboardClick('dashboard_complet');
+            });
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachDashboardLinkLogger);
+    } else {
+        attachDashboardLinkLogger();
+    }
+})();
+</script>
 
 <style>
 .participants-list {
@@ -538,6 +727,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     activitiesContainer.classList.add('hidden');
                     chainlitContainer.classList.add('active');
+                    if (window.simbaRefreshCogWidget) { setTimeout(window.simbaRefreshCogWidget, 1500); }
                     document.body.classList.add('chainlit-active');
                 }
             }
@@ -709,6 +899,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(activity => {
                         console.log('Activity data received:', activity);
                         
+                        // Retire toute modale d'édition déjà présente (ex. fermeture précédente
+                        // ratée) pour éviter d'avoir deux éléments avec le même id en même temps.
+                        const staleEditModal = document.getElementById('editActivityModal');
+                        if (staleEditModal) {
+                            staleEditModal.remove();
+                        }
+
                         const createModal = document.getElementById('activityModal');
                         const editModal = createModal.cloneNode(true);
                         editModal.id = 'editActivityModal';
@@ -761,6 +958,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         form.querySelector('#subjects').value = activity.subjects || '';
                         form.querySelector('#restrict-to-subject').checked = activity.restrict_to_subject;
                         form.querySelector('#allow-questions').checked = activity.allow_questions;
+                        form.querySelector('#never-answer-directly').checked = activity.never_answer_directly;
                         form.querySelector('#allow-emojis').checked = activity.allow_emojis;
                         form.querySelector('#trust-document').checked = activity.trust_document;
                         form.querySelector('#word-limit').value = activity.word_limit || 0;
@@ -782,6 +980,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 subjects: form.querySelector('#subjects').value,
                                 restrict_to_subject: form.querySelector('#restrict-to-subject').checked,
                                 allow_questions: form.querySelector('#allow-questions').checked,
+                                never_answer_directly: form.querySelector('#never-answer-directly').checked,
                                 allow_emojis: form.querySelector('#allow-emojis').checked,
                                 trust_document: form.querySelector('#trust-document').checked,
                                 word_limit: parseInt(form.querySelector('#word-limit').value) || 0
@@ -809,7 +1008,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                     activityItem.querySelector('.activity-title').textContent = updatedActivity.title;
                                 }
                                 
-                                document.body.removeChild(editModal);
+                                // .remove() ne leve jamais d'exception, meme si l'element
+                                // n'est deja plus dans le DOM (contrairement a
+                                // parentNode.removeChild(), qui plantait ici et empechait
+                                // le message de succes + le rechargement de s'executer).
+                                editModal.remove();
                                 
                                 alert( gettext('Activity updated successfully!'));
                                 
@@ -823,7 +1026,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         const closeBtn = editModal.querySelector('.close');
                         closeBtn.addEventListener('click', function() {
-                            document.body.removeChild(editModal);
+                            editModal.remove();
                         });
                         
                         setupEditModalEventListeners(editModal);
@@ -889,6 +1092,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show Chainlit container and hide activities
                 activitiesContainer.classList.add('hidden');
                 chainlitContainer.classList.add('active');
+                if (window.simbaRefreshCogWidget) { setTimeout(window.simbaRefreshCogWidget, 1500); }
                 document.body.classList.add('chainlit-active');
                 
                 // Close any open menus
@@ -1127,7 +1331,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         window.addEventListener('click', function(event) {
             if (event.target === modal) {
-                document.body.removeChild(modal);
+                modal.remove();
             }
         });
     }
@@ -1325,4 +1529,4 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-{% endblock %} 
+{% endblock %}

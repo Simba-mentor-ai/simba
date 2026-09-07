@@ -3,7 +3,7 @@ from django.contrib import messages
 import requests
 from django.urls import reverse
 from django.conf import settings
-from .models import User, Course, Activity, CourseEnrollment, Message, ActivityToken, EmailVerificationToken, PasswordResetToken
+from .models import User, Course, Activity, CourseEnrollment, Message, ActivityToken, EmailVerificationToken, PasswordResetToken, DashboardInteraction
 import json
 import logging
 import gettext
@@ -370,6 +370,43 @@ def chainlit_view(request):
         messages.error(request, "Activity not found.")
         return redirect('courses')
 
+
+def student_cognitive_dashboard_view(request):
+    """
+    SIMBA — Dashboard Étudiant (page de détail).
+    Rendu léger : la page ne fait que passer user_id / activity_id / api_base
+    au template ; toutes les données sont récupérées côté client en JS via
+    /api/student-dashboard/scores/{user_id}/, pour rester réactif en temps réel.
+    """
+    if not request.session.get('user_id'):
+        return redirect('login')
+
+    viewer_id = request.session.get('user_id')
+    student_id = request.GET.get('user_id', viewer_id)
+    activity_id = request.GET.get('activity_id')
+
+    try:
+        student = User.objects.get(id=student_id)
+    except User.DoesNotExist:
+        messages.error(request, "Student not found.")
+        return redirect('courses')
+
+    activity = None
+    if activity_id:
+        try:
+            activity = Activity.objects.get(id=activity_id)
+        except Activity.DoesNotExist:
+            activity = None
+
+    context = {
+        'student': student,
+        'student_id': str(student.id),
+        'activity': activity,
+        'activity_id': str(activity.id) if activity else '',
+        'is_own_dashboard': str(student.id) == str(viewer_id),
+    }
+    return render(request, 'student_dashboard.html', context)
+
 def courses_view(request):
     if not request.session.get('user_id'):
         return redirect('login')
@@ -625,7 +662,7 @@ def create_activity_view(request, course_id):
             "end_date": end_date_obj.isoformat() if end_date_obj else None,
             "is_visible": request.POST.get('is_visible') == 'on',
             "allow_redo": request.POST.get('allow_redo') == 'on',
-            "ai_model": request.POST.get('ai_model', 'gpt'),
+            "ai_model": request.POST.get('ai_model', 'mistral'),
             "files": files_data,
             "options" : {"language" : userLanguage}
         }
@@ -1005,6 +1042,7 @@ def dashboard_view(request):
             'stats_per_student': [],
             'all_students': [],
             'raw_messages': [],
+            'raw_dashboard_interactions': [],
             'enrolled_courses': courses,
             'activity_names': [],
             'activity_message_counts': [],
@@ -1228,6 +1266,25 @@ def dashboard_view(request):
     else:
         # Show all messages for teachers
         raw_messages = base_msg_query.order_by('-timestamp')[:100]
+
+    # Raw dashboard interactions (clics sur le dashboard cognitif), même logique
+    # de filtrage par cours/activité que raw_messages ci-dessus.
+    if selected_course_id and selected_course_id != 'all' and selected_course:
+        dashboard_interactions_query = DashboardInteraction.objects.filter(
+            activity__course=selected_course
+        ).select_related('user', 'activity')
+    else:
+        dashboard_interactions_query = DashboardInteraction.objects.filter(
+            activity__course__in=courses
+        ).select_related('user', 'activity')
+
+    if selected_activity_id and selected_activity_id != 'all':
+        dashboard_interactions_query = dashboard_interactions_query.filter(activity_id=selected_activity_id)
+
+    if view_as == 'student':
+        raw_dashboard_interactions = dashboard_interactions_query.filter(user=user).order_by('-timestamp')[:100]
+    else:
+        raw_dashboard_interactions = dashboard_interactions_query.order_by('-timestamp')[:100]
     
     # If viewing as student, prepare personal statistics
     student_personal_stats = None
@@ -1285,6 +1342,7 @@ def dashboard_view(request):
         'stats_per_student': stats_per_student,
         'all_students': all_students,
         'raw_messages': raw_messages,
+        'raw_dashboard_interactions': raw_dashboard_interactions,
         'enrolled_courses': courses,
         'activity_names': activity_names,
         'activity_message_counts': activity_message_counts,

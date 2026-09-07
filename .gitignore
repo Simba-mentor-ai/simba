@@ -177,3 +177,23 @@ cython_debug/
 .pypirc
 
 .logs/*
+# Sensitive or environment files
+.env.local
+.env.production
+.env.*.local
+secrets.yml
+secrets.yaml
+credentials.json
+*.pem
+*.key
+id_rsa
+id_rsa.pub
+*.p12
+*.jks
+# VSCode workspace
+.vscode/
+# Docker credentials
+.docker/config.json
+# Mac / Windows system files
+.DS_Store
+Thumbs.db

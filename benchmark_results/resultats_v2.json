@@ -1,0 +1,258 @@
+{
+  "summary": {
+    "n_examples": 85,
+    "api_errors": 0,
+    "exact_match_ratio": 0.8470588235294118,
+    "hamming_accuracy": 0.984313725490196,
+    "macro_precision": 0.8793560606060606,
+    "macro_recall": 0.9642857142857143,
+    "macro_f1": 0.9121922453191803,
+    "avg_latency_seconds": 2.3404704654917996
+  },
+  "per_code": {
+    "E": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 5,
+      "tp": 5,
+      "fp": 0,
+      "fn": 0
+    },
+    "I": {
+      "precision": 0.875,
+      "recall": 1.0,
+      "f1": 0.9333333333333333,
+      "support": 7,
+      "tp": 7,
+      "fp": 1,
+      "fn": 0
+    },
+    "V": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 8,
+      "tp": 8,
+      "fp": 0,
+      "fn": 0
+    },
+    "S": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 7,
+      "tp": 7,
+      "fp": 0,
+      "fn": 0
+    },
+    "A": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 6,
+      "tp": 6,
+      "fp": 0,
+      "fn": 0
+    },
+    "Mb": {
+      "precision": 0.8,
+      "recall": 0.5714285714285714,
+      "f1": 0.6666666666666666,
+      "support": 7,
+      "tp": 4,
+      "fp": 1,
+      "fn": 3
+    },
+    "Md": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 6,
+      "tp": 6,
+      "fp": 0,
+      "fn": 0
+    },
+    "Pb": {
+      "precision": 0.7272727272727273,
+      "recall": 1.0,
+      "f1": 0.8421052631578948,
+      "support": 8,
+      "tp": 8,
+      "fp": 3,
+      "fn": 0
+    },
+    "Pp": {
+      "precision": 0.7,
+      "recall": 1.0,
+      "f1": 0.8235294117647058,
+      "support": 7,
+      "tp": 7,
+      "fp": 3,
+      "fn": 0
+    },
+    "Am": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 7,
+      "tp": 7,
+      "fp": 0,
+      "fn": 0
+    },
+    "Cd": {
+      "precision": 0.7,
+      "recall": 1.0,
+      "f1": 0.8235294117647058,
+      "support": 7,
+      "tp": 7,
+      "fp": 3,
+      "fn": 0
+    },
+    "Cs": {
+      "precision": 0.75,
+      "recall": 1.0,
+      "f1": 0.8571428571428571,
+      "support": 6,
+      "tp": 6,
+      "fp": 2,
+      "fn": 0
+    }
+  },
+  "mismatches": [
+    {
+      "id": "S-4",
+      "text": "Comment je peux vérifier que ce que tu dis est vrai ?",
+      "expected": [
+        "S"
+      ],
+      "predicted": [
+        "I",
+        "S"
+      ]
+    },
+    {
+      "id": "Mb-1",
+      "text": "Je ne comprends pas bien cette partie, tu peux réexpliquer plus simplement ?",
+      "expected": [
+        "Mb"
+      ],
+      "predicted": [
+        "Cs"
+      ]
+    },
+    {
+      "id": "Md-5",
+      "text": "En creusant, est-ce que cette explication contredit celle que tu m'as donnée avant ?",
+      "expected": [
+        "Md"
+      ],
+      "predicted": [
+        "Md",
+        "Cd"
+      ]
+    },
+    {
+      "id": "Am-1",
+      "text": "En fait laisse-moi reformuler ma question plus précisément : quelles sont les causes démographiques ?",
+      "expected": [
+        "Am"
+      ],
+      "predicted": [
+        "Pp",
+        "Am"
+      ]
+    },
+    {
+      "id": "Am-2",
+      "text": "Je vais être plus précis dans ma demande : je veux seulement les causes économiques, pas sociales.",
+      "expected": [
+        "Am"
+      ],
+      "predicted": [
+        "Pb",
+        "Am"
+      ]
+    },
+    {
+      "id": "Cs-4",
+      "text": "C'est quoi le mot que tu viens d'utiliser ?",
+      "expected": [
+        "Cs"
+      ],
+      "predicted": [
+        "Mb",
+        "Cs"
+      ]
+    },
+    {
+      "id": "combo-4",
+      "text": "Attends, je ne comprends pas bien cette partie, et en creusant, est-ce que ça remettrait en cause tout mon raisonnement ?",
+      "expected": [
+        "Mb",
+        "Md"
+      ],
+      "predicted": [
+        "Md",
+        "Cd",
+        "Cs"
+      ]
+    },
+    {
+      "id": "combo-8",
+      "text": "Je ne suis pas sûr d'avoir compris, tu peux répéter simplement ce que tu viens de dire ?",
+      "expected": [
+        "Mb",
+        "Cs"
+      ],
+      "predicted": [
+        "Cs"
+      ]
+    },
+    {
+      "id": "combo-9",
+      "text": "Mon but est de bien cerner le sujet, qui porte sur les conséquences sociales de l'industrialisation. Tu peux m'aider à y voir plus clair ?",
+      "expected": [
+        "Pb",
+        "Pp"
+      ],
+      "predicted": [
+        "Pb",
+        "Pp",
+        "Cd"
+      ]
+    },
+    {
+      "id": "neg-3",
+      "text": "Voici mon texte : l'exode rural a débuté au XIXe siècle avec la mécanisation agricole.",
+      "expected": [],
+      "predicted": [
+        "Pp"
+      ]
+    },
+    {
+      "id": "neg-5",
+      "text": "Je vais continuer à rédiger ma partie maintenant.",
+      "expected": [],
+      "predicted": [
+        "Pb"
+      ]
+    },
+    {
+      "id": "neg-8",
+      "text": "Le sujet parle de l'urbanisation au XIXe siècle en Europe.",
+      "expected": [],
+      "predicted": [
+        "Pp"
+      ]
+    },
+    {
+      "id": "neg-12",
+      "text": "Je vais passer à la partie suivante maintenant.",
+      "expected": [],
+      "predicted": [
+        "Pb"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}SIMBA — Dashboard Étudiant{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<style>
+    :root {
+        --simba-good: #2E7D5E;
+        --simba-warn: #C9971F;
+        --simba-bad: #C0392B;
+    }
+    .cog-back-link {
+        display: inline-flex; align-items: center; gap: 6px;
+        color: #888888; text-decoration: none; font-size: 0.82rem; margin-bottom: 18px;
+    }
+    .cog-back-link:hover { color: var(--primary-color); }
+    .cog-header {
+        background: #ffffff;
+        border: 1px solid var(--border-color);
+        border-left: 4px solid var(--primary-color);
+        border-radius: 0 8px 8px 0;
+        padding: 18px 22px; margin-bottom: 26px;
+    }
+    .cog-header h1 { margin: 0; font-size: 1.5rem; color: var(--text-color); font-weight: 700; }
+    .cog-header p { margin: 4px 0 0 0; color: #888888; font-size: 0.85rem; }
+    .cog-section-title {
+        font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+        color: var(--primary-color); border-bottom: 1px solid var(--border-color); padding-bottom: 8px;
+        margin: 32px 0 16px 0;
+    }
+    .cog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .cog-card {
+        background: #ffffff; border: 1px solid var(--border-color); border-radius: 8px;
+        padding: 16px 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    }
+    .cog-cursor-label {
+        font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+        color: #666666; display: flex; align-items: center; justify-content: space-between;
+    }
+    .cog-info-toggle {
+        cursor: pointer; color: #999999; font-size: 0.78rem; border: 1px solid var(--border-color);
+        border-radius: 50%; width: 18px; height: 18px; display: inline-flex; align-items: center;
+        justify-content: center; user-select: none; font-style: italic; font-weight: 600;
+    }
+    .cog-info-toggle:hover { color: #ffffff; border-color: var(--primary-color); background: var(--primary-color); }
+    .cog-cursor-track {
+        position: relative; height: 8px; border-radius: 4px; margin: 12px 0 8px 0;
+        background: linear-gradient(90deg, var(--simba-bad) 0%, var(--simba-warn) 50%, var(--simba-good) 100%);
+        opacity: 0.45;
+    }
+    .cog-cursor-marker {
+        position: absolute; top: -5px; width: 18px; height: 18px; border-radius: 50%;
+        background: #ffffff; border: 2px solid #ffffff; transform: translateX(-50%);
+        box-shadow: 0 0 0 3px currentColor, 0 1px 4px rgba(0,0,0,0.25);
+    }
+    .cog-status-text { font-size: 0.82rem; font-weight: 600; margin-bottom: 4px; }
+    .cog-explain {
+        display: none; font-size: 0.76rem; line-height: 1.5; color: #666666;
+        background: var(--hover-color); border-left: 3px solid var(--primary-color); border-radius: 0 6px 6px 0;
+        padding: 8px 10px; margin-top: 8px;
+    }
+    .cog-explain.open { display: block; }
+    .cog-plot-card { background: #ffffff; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; }
+    .cog-percentile-box { text-align: center; padding: 22px 10px; }
+    .cog-percentile-box .big { font-size: 2.1rem; font-weight: 700; color: var(--primary-color); }
+    .cog-percentile-track {
+        position: relative; height: 8px; border-radius: 4px; background: #eeeeee;
+        margin: 22px 10px 34px 10px;
+    }
+    .cog-percentile-marker {
+        position: absolute; top: -12px; transform: translateX(-50%);
+        display: flex; flex-direction: column; align-items: center; font-size: 0.65rem; color: #666666;
+    }
+    .cog-percentile-marker .pin { width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+    .cog-empty-state { text-align: center; color: #888888; padding: 60px 20px; font-size: 0.95rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<a class="cog-back-link" href="javascript:history.back()">← {% trans 'Retour au chat' %}</a>
+
+<div class="cog-header">
+    <h1>Dashboard Étudiant{% if not is_own_dashboard %} — {{ student.username }}{% endif %}</h1>
+    <p>{% if activity %}Activité : {{ activity.title }}{% else %}Toutes activités confondues{% endif %} · Mis à jour en temps réel</p>
+</div>
+
+<div id="cog-empty-state" class="cog-empty-state" style="display:none;">
+    Pas encore assez d'échanges avec l'IA pour calculer ton profil. Continue la conversation, il apparaîtra ici automatiquement.
+</div>
+
+<div id="cog-dashboard-content" style="display:none;">
+
+    <div class="cog-section-title">Ton profil d'utilisation de l'IA</div>
+    <div class="cog-grid" id="cog-cursors-grid"></div>
+
+    <div class="cog-section-title">Profil métacognitif</div>
+    <div class="cog-grid">
+        <div class="cog-plot-card" style="grid-column: span 2;"><div id="cog-radar-chart" style="height:340px;"></div></div>
+        <div class="cog-plot-card"><div id="cog-depth-chart" style="height:340px;"></div></div>
+    </div>
+
+    <div class="cog-section-title">Ta position dans la classe</div>
+    <div class="cog-grid">
+        <div class="cog-card" id="cog-class-position-card"></div>
+        <div class="cog-plot-card"><div id="cog-donut-chart" style="height:280px;"></div></div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const COG_STATUS_HEX = { good: '#2E7D5E', warn: '#C9971F', bad: '#C0392B' };
+const COG_STATUS_POS = { bad: 12, warn: 50, good: 88 };
+
+const COG_EXPLANATIONS = {
+    autonomie: "Mesure si tu demandes surtout à l'IA de faire le travail à ta place (rédiger, résumer) ou plutôt de t'expliquer comment faire en gardant le contrôle. Plus tu restes autonome, plus tu développes tes propres compétences.",
+    esprit_critique: "Mesure si tu remets en question ce que dit l'IA : corriges-tu ses erreurs ? Lui demandes-tu ses sources ? Une IA peut se tromper ou halluciner une source — la questionner est un réflexe clé.",
+    verif_source: "Sous-partie de l'esprit critique : exiges-tu une référence ou une justification pour ce que l'IA affirme, plutôt que de l'accepter tel quel ?",
+    auto_evaluation: "Mesure si tu utilises l'IA pour vérifier et évaluer ta propre production (longueur, structure, compréhension), plutôt que seulement pour produire du contenu.",
+    qualite_prompts: "Mesure si tu reformules et affines volontairement tes questions pour obtenir de meilleures réponses, signe d'une utilisation stratégique de l'IA.",
+};
+
+const COG_LABELS = {
+    autonomie: "Autonomie face à l'IA",
+    esprit_critique: "Esprit critique",
+    auto_evaluation: "Auto-évaluation",
+    qualite_prompts: "Qualité de tes prompts",
+};
+
+// Correspondance entre la clé utilisée côté affichage et le nom du champ
+// réellement stocké côté serveur (DashboardInteraction / raw data enseignant).
+const COG_BACKEND_FIELD = {
+    autonomie: "reliance",
+    esprit_critique: "verif_epistemique",
+    verif_source: "verif_source",
+    auto_evaluation: "selfeval",
+    qualite_prompts: "prompt_qual",
+};
+
+function simbaLogDashboardClick(key) {
+    const userId = "{{ student_id }}";
+    const activityId = "{{ activity_id }}";
+    if (!userId) return;
+    fetch(`/api/student-dashboard/log-click/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            user_id: userId,
+            activity_id: activityId || null,
+            element_clicked: COG_BACKEND_FIELD[key] || key,
+        }),
+    }).catch(e => console.warn('SIMBA dashboard click log failed', e));
+}
+
+function cogCursorCard(key, label, statusObj) {
+    if (!statusObj) return '';
+    const pos = COG_STATUS_POS[statusObj.level] ?? 50;
+    const color = COG_STATUS_HEX[statusObj.level] ?? '#999999';
+    return `
+    <div class="cog-card">
+        <div class="cog-cursor-label">
+            <span>${label}</span>
+            <span class="cog-info-toggle" onclick="this.parentElement.parentElement.querySelector('.cog-explain').classList.toggle('open'); simbaLogDashboardClick('${key}')">i</span>
+        </div>
+        <div class="cog-cursor-track">
+            <div class="cog-cursor-marker" style="left:${pos}%; color:${color};"></div>
+        </div>
+        <div class="cog-status-text" style="color:${color};">${statusObj.text}</div>
+        <div class="cog-explain">${COG_EXPLANATIONS[key] || ''}</div>
+    </div>`;
+}
+
+async function loadCogDashboard() {
+    const userId = "{{ student_id }}";
+    const activityId = "{{ activity_id }}";
+    const url = `/api/student-dashboard/scores/${userId}/${activityId ? '?activity_id=' + activityId : ''}`;
+
+    let payload;
+    try {
+        const res = await fetch(url);
+        payload = await res.json();
+    } catch (e) {
+        document.getElementById('cog-empty-state').style.display = 'block';
+        document.getElementById('cog-empty-state').textContent = "Impossible de charger le dashboard pour le moment.";
+        return;
+    }
+
+    const scores = payload.scores;
+    if (!scores || !scores.has_data) {
+        document.getElementById('cog-empty-state').style.display = 'block';
+        return;
+    }
+    document.getElementById('cog-dashboard-content').style.display = 'block';
+
+    const status = scores.status;
+    const grid = document.getElementById('cog-cursors-grid');
+    grid.innerHTML =
+        cogCursorCard('autonomie', COG_LABELS.autonomie, status.reliance) +
+        cogCursorCard('esprit_critique', "Vigilance envers les erreurs de l'IA", status.verif_epistemique) +
+        cogCursorCard('verif_source', "Vérification des sources", status.verif_source) +
+        cogCursorCard('auto_evaluation', COG_LABELS.auto_evaluation, status.selfeval) +
+        cogCursorCard('qualite_prompts', COG_LABELS.qualite_prompts, status.prompt_qual);
+
+    // Radar métacognitif
+    const r = scores.radar;
+    const cats = ["Autonomie", "Vigilance épist.", "Vérif. source", "Auto-éval.", "Qualité prompts", "Autonomie"];
+    const vals = [r.autonomie, r.vigilance_epistemique, r.verif_source, r.auto_evaluation, r.qualite_prompts, r.autonomie];
+    Plotly.newPlot('cog-radar-chart', [
+        { type: 'scatterpolar', r: [0.7,0.7,0.7,0.7,0.7,0.7], theta: cats, fill: 'toself',
+          fillcolor: 'rgba(46,125,94,0.06)', line: {color: '#2E7D5E', width: 1, dash: 'dot'}, name: 'Zone idéale', hoverinfo: 'skip' },
+        { type: 'scatterpolar', r: vals, theta: cats, fill: 'toself',
+          fillcolor: 'rgba(214,64,0,0.15)', line: {color: '#d64000', width: 2}, name: 'Ton profil' },
+    ], {
+        polar: { bgcolor: '#ffffff',
+            radialaxis: { visible: true, range: [0,1], showticklabels: false, gridcolor: '#eeeeee' },
+            angularaxis: { gridcolor: '#eeeeee', tickfont: { color: '#555555', size: 10 } } },
+        showlegend: true, legend: { font: { color: '#555555', size: 10 }, orientation: 'h', y: -0.15 },
+        paper_bgcolor: 'rgba(0,0,0,0)', margin: { t: 20, b: 20, l: 30, r: 30 },
+        font: { color: '#333333' },
+    }, { displayModeBar: false, responsive: true });
+
+    // Shallow vs Deep (données propres à l'étudiant)
+    const shallow = scores.indicators.shallow, deep = scores.indicators.deep;
+    Plotly.newPlot('cog-depth-chart', [{
+        x: ['Questions superficielles', 'Questions approfondies'], y: [shallow, deep], type: 'bar',
+        marker: { color: ['#C0392B', '#2E7D5E'] },
+    }], {
+        paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: '#ffffff',
+        font: { color: '#555555', size: 10 },
+        margin: { t: 30, b: 40, l: 30, r: 10 },
+        title: { text: 'Répartition de tes questions', font: { size: 12, color: '#d64000' } },
+        yaxis: { gridcolor: '#eeeeee' },
+    }, { displayModeBar: false, responsive: true });
+
+    // Donut répartition des types d'interactions
+    const c = scores.counts;
+    const donutLabels = ['Exécutif', 'Instrumental', 'Vigilance épist.', 'Vérif. source', 'Auto-éval.', 'Amélio. prompts'];
+    const donutValues = [c.E, c.I, c.V, c.S, c.A + c.Mb + c.Md, c.Am];
+    const donutColors = ['#C0392B', '#2E7D5E', '#7B2FC9', '#4A90D9', '#C9971F', '#d64000'];
+    const filtered = donutLabels.map((l,i) => ({l, v: donutValues[i], col: donutColors[i]})).filter(x => x.v > 0);
+    Plotly.newPlot('cog-donut-chart', [{
+        labels: filtered.map(x => x.l), values: filtered.map(x => x.v), type: 'pie', hole: 0.6,
+        marker: { colors: filtered.map(x => x.col), line: { color: '#ffffff', width: 2 } },
+        textfont: { size: 10, color: '#555555' },
+    }], {
+        paper_bgcolor: 'rgba(0,0,0,0)', showlegend: false,
+        title: { text: 'Répartition de tes échanges', font: { size: 12, color: '#d64000' } },
+        margin: { t: 30, b: 10, l: 10, r: 10 },
+        annotations: [{ text: `${scores.N}<br><span style="font-size:9px">échanges</span>`, showarrow: false, font: { size: 16, color: '#333333' } }],
+    }, { displayModeBar: false, responsive: true });
+
+    // Position dans la classe — percentile uniquement, jamais les scores des autres étudiants
+    const pos = payload.class_position;
+    const card = document.getElementById('cog-class-position-card');
+    if (pos && pos.available) {
+        card.innerHTML = `
+            <div class="cog-percentile-box">
+                <div class="big">${pos.percentile}<span style="font-size:1rem;">e</span></div>
+                <div style="font-size:0.78rem; color:#666666;">percentile d'autonomie sur ${pos.class_size} étudiants</div>
+            </div>
+            <div class="cog-percentile-track">
+                <div class="cog-percentile-marker" style="left:${Math.round(pos.median_autonomy*100)}%;">
+                    <span>médiane</span><span class="pin" style="background:#999999;"></span>
+                </div>
+                <div class="cog-percentile-marker" style="left:${Math.round(pos.my_autonomy*100)}%; color:#d64000;">
+                    <span>toi</span><span class="pin" style="background:#d64000;"></span>
+                </div>
+            </div>
+            <div style="font-size:0.72rem; color:#888888; text-align:center;">Position calculée uniquement à partir de ton autonomie relative — les scores des autres étudiants ne sont jamais affichés individuellement.</div>`;
+    } else {
+        card.innerHTML = `<div class="cog-empty-state" style="padding:20px 0;">Pas encore assez d'étudiants classifiés dans ce cours pour te positionner.</div>`;
+    }
+}
+
+loadCogDashboard();
+</script>
+{% endblock %}

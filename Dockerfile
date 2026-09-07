@@ -16,6 +16,9 @@ COPY . /code/
 COPY entrypoint.sh /code/
 RUN chmod +x /code/entrypoint.sh
 
+# Add this line to create the logs directory
+RUN mkdir -p /code/logs
+
 RUN python manage.py compilemessages
 
 RUN python manage.py collectstatic --noinput
