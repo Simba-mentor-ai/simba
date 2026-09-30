@@ -10,8 +10,12 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       PGDATA: /var/lib/postgresql/data/pgdata
+    # Database files live on the server's /local disk (more space than Docker's
+    # default storage on the system disk). Before the first deploy with this
+    # file, the existing data has to be copied over from the old "db" volume
+    # once, otherwise Postgres starts with an empty database.
     volumes:
-      - db:/var/lib/postgresql/data
+      - /local/simba/postgres:/var/lib/postgresql/data
     ports:
       - "5433:5433"
     command: ["postgres", "-c", "port=5433"]
@@ -30,10 +34,18 @@ services:
       - BASE_URL=https://simba-refact.irit.fr
       - EMAIL=${EMAIL}
       - EMAILAPPPWD=${EMAILAPPPWD}
+    # /code/logs comes from /local so django_errors.log survives deploys.
+    # Before, it lived in the "web" volume, which deploy.sh deletes every time,
+    # so the evidence of a crash was gone after the next deploy.
+    # static and media are on /local too (both empty today), so any data the app
+    # writes there later doesn't end up on /var.
+    # "web" stays a named volume: Docker fills it with the code from the image,
+    # which it wouldn't do for an empty /local folder.
     volumes:
       - web:/code
-      - static_volume:/app/static
-      - media_volume:/app/media
+      - /local/simba/logs:/code/logs
+      - /local/simba/static:/app/static
+      - /local/simba/media:/app/media
     entrypoint: ["sh", "/code/entrypoint.sh"]
     ports:
       - "8000:8000"
@@ -54,8 +66,10 @@ services:
       - BASE_URL=https://simba-refact.irit.fr
       - EMAIL=${EMAIL}
       - EMAILAPPPWD=${EMAILAPPPWD}
+    # Chainlit loads the same Django settings, so its errors go to the same log file
     volumes:
       - web:/code
+      - /local/simba/logs:/code/logs
     command: ["chainlit", "run", "chainlit_app.py", "--host", "0.0.0.0", "--port", "8500"]
     ports:
       - "8500:8500"
@@ -68,10 +82,7 @@ services:
 
 
 volumes:
-  db:
   web:
-  static_volume:
-  media_volume:
 
 networks:
   simba-network:
