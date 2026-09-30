@@ -550,114 +550,45 @@ async def on_message(message: cl.Message):
                 await cl.Message(content=f"I apologize, but I'm having trouble processing your request right now. Please try again in a moment. Error: {str(e)}").send()
         
         else:
-            openai_assistant_id = activity_data.get('openai_assistant_id')
+            # Assistants API is shut down (Aug 2026): use the Responses API, with
+            # file_search over the activity's vector store when it has documents.
             vector_store_id = activity_data.get('vector_store_id')
-            
-            logger.info(f"GPT model - Assistant ID: {openai_assistant_id}, Vector Store: {vector_store_id}")
-            
-            if openai_assistant_id:
-                try:
-                    logger.info(f"Using OpenAI Assistant API with assistant {openai_assistant_id}")
-                    openai_thread_id = cl.user_session.get("openai_thread_id")
-                    if not openai_thread_id:
-                        openai_thread = await openai_client.beta.threads.create()
-                        openai_thread_id = openai_thread.id
-                        cl.user_session.set("openai_thread_id", openai_thread_id)
-                        logger.info(f"Created new OpenAI thread: {openai_thread_id}")
+            logger.info(f"GPT model - Vector Store: {vector_store_id}")
 
-                        messages_history = await api_get_messages_for_thread(thread_id)
-                        if messages_history:
-                            logger.info(f"Populating OpenAI thread with {len(messages_history)} existing messages")
-                            for msg in messages_history:
-                                msg_role = msg['role'] if msg['role'] in ['user', 'assistant'] else 'user'
-                                await openai_client.beta.threads.messages.create(
-                                    thread_id=openai_thread_id,
-                                    role=msg_role,
-                                    content=msg['content']
-                                )
-                            logger.info(f"Successfully populated OpenAI thread with message history")
-                    
-                    await openai_client.beta.threads.messages.create(
-                        thread_id=openai_thread_id,
-                        role="user",
-                        content=message.content
-                    )
-                    
-                    run = await openai_client.beta.threads.runs.create(
-                        thread_id=openai_thread_id,
-                        assistant_id=openai_assistant_id
-                    )
-                    
-                    # Wait for completion with timeout
-                    max_attempts = 30  # 30 seconds timeout
-                    attempts = 0
-                    while run.status in ['queued', 'in_progress'] and attempts < max_attempts:
-                        await asyncio.sleep(1)
-                        attempts += 1
-                        run = await openai_client.beta.threads.runs.retrieve(
-                            thread_id=openai_thread_id,
-                            run_id=run.id
-                        )
-                        logger.info(f"Run status: {run.status} (attempt {attempts})")
-                    
-                    if run.status == 'completed':
-                        messages = await openai_client.beta.threads.messages.list(
-                            thread_id=openai_thread_id,
-                            limit=1
-                        )
-                        
-                        if messages.data:
-                            latest_message = messages.data[0]
-                            if latest_message.content:
-                                ai_response_content = latest_message.content[0].text.value
-                                
-                                await api_create_message(thread_id, ai_response_content, "assistant", user_id, model_name="gpt-4o-mini")
-                                
-                                await cl.Message(content=ai_response_content).send()
-                                logger.info(f"Assistant response sent successfully")
-                            else:
-                                logger.error("Assistant message has no content")
-                                await cl.Message(content="I apologize, but I couldn't generate a response. Please try again.").send()
-                        else:
-                            logger.error("No messages returned from assistant")
-                            await cl.Message(content="I apologize, but I couldn't retrieve the response. Please try again.").send()
-                    elif run.status == 'failed':
-                        logger.error(f"OpenAI run failed: {run.last_error}")
-                        await cl.Message(content="I apologize, but I encountered an error processing your request. Please try again.").send()
-                    elif attempts >= max_attempts:
-                        logger.error(f"OpenAI run timed out after {max_attempts} seconds")
-                        await cl.Message(content="I apologize, but the request is taking too long. Please try again.").send()
-                    else:
-                        logger.error(f"OpenAI run failed with status: {run.status}")
-                        await cl.Message(content="I apologize, but I encountered an error processing your request. Please try again.").send()
-                        
-                except Exception as e:
-                    logger.error(f"OpenAI Assistant API Error: {e}")
-                    await cl.Message(content=f"I apologize, but I'm having trouble processing your request right now. Please try again in a moment. Error: {str(e)}").send()
-                    
-            else:
-                logger.info("No OpenAI assistant available - using legacy chat completions mode")
-                
+            try:
                 language_code = cl.user_session.get("language", "en")
                 system_prompt_content = build_system_prompt(activity_data, logger, language_code)
-                
-                messages_history_data = await api_get_messages_for_thread(thread_id)
-                openai_messages = [{"role": "system", "content": system_prompt_content}]
 
+                messages_history_data = await api_get_messages_for_thread(thread_id)
+                openai_input = []
                 for msg_data in messages_history_data:
-                    openai_role = msg_data['role'] if msg_data['role'] in ["assistant", "user"] else "user" 
-                    openai_messages.append({"role": openai_role, "content": msg_data['content']})
-                    
-                response = await openai_client.chat.completions.create(
+                    openai_role = msg_data['role'] if msg_data['role'] in ["assistant", "user"] else "user"
+                    openai_input.append({"role": openai_role, "content": msg_data['content']})
+
+                tools = []
+                if vector_store_id:
+                    tools.append({"type": "file_search", "vector_store_ids": [vector_store_id]})
+
+                response = await openai_client.responses.create(
                     model=openai_settings["model"],
-                    messages=openai_messages,
+                    instructions=system_prompt_content,
+                    input=openai_input,
+                    tools=tools,
                     temperature=openai_settings["temperature"],
                 )
-                ai_response_content = response.choices[0].message.content
-                
+                ai_response_content = response.output_text
+                if not ai_response_content:
+                    logger.error(f"OpenAI returned an empty response (status: {response.status})")
+                    await cl.Message(content="I apologize, but I couldn't generate a response. Please try again.").send()
+                    return
+
                 await api_create_message(thread_id, ai_response_content, "assistant", user_id, model_name=openai_settings["model"])
                 await cl.Message(content=ai_response_content).send()
-                logger.info("Legacy chat completion response sent successfully")
+                logger.info(f"OpenAI response sent successfully (file_search: {bool(tools)})")
+
+            except Exception as e:
+                logger.error(f"OpenAI Error: {e}")
+                await cl.Message(content=f"I apologize, but I'm having trouble processing your request right now. Please try again in a moment. Error: {str(e)}").send()
         
     except Exception as e:
         logger.error(f"Error processing message: {e}")

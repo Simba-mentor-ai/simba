@@ -412,9 +412,6 @@ def create_activity_api(request, payload: ActivityCreateSchema, user_id: str):
             options['word_limit'] = payload.word_limit
         
 
-        assistant_id = None
-        vector_store_id = None
-
         activity = Activity.objects.create(
             course=course,
             owner=user,
@@ -428,8 +425,6 @@ def create_activity_api(request, payload: ActivityCreateSchema, user_id: str):
             allow_redo=payload.allow_redo,
             ai_model=payload.ai_model,
             llm_model=resolve_together_model(payload.llm_model) if payload.ai_model == 'together' else None,
-            openai_assistant_id=assistant_id,
-            vector_store_id=vector_store_id,
             options=options
         )
 
@@ -480,19 +475,20 @@ def create_activity_api(request, payload: ActivityCreateSchema, user_id: str):
                         logger.error(f"Invalid file format at index {i}: {file_base64[:100]}...")
                         return HTTPStatus.BAD_REQUEST, {"message": f"Invalid file format at position {i+1}. Expected 'filename:content_type:base64_content'"}
             
-            logger.info(f"Creating OpenAI assistant for activity with {len(files_to_upload)} files")
-            assistant_result = openai_assistant.create_assistant(activity_data, files_to_upload, user_language)
+            logger.info(f"Uploading {len(files_to_upload)} documents for GPT activity")
+            documents_result = openai_assistant.create_activity_documents(activity_data, files_to_upload)
             
-            if not assistant_result['success']:
-                error_msg = assistant_result.get('error', 'Unknown error')
-                logger.error(f"Failed to create OpenAI assistant: {error_msg}")
-                return HTTPStatus.BAD_REQUEST, {"message": f"Failed to create OpenAI assistant: {error_msg}"}
+            if not documents_result['success']:
+                error_msg = documents_result.get('error', 'Unknown error')
+                logger.error(f"Failed to upload activity documents: {error_msg}")
+                # The row was created above; don't leave a GPT activity without its documents
+                activity.delete()
+                return HTTPStatus.BAD_REQUEST, {"message": f"Failed to upload activity documents: {error_msg}"}
 
-            assistant_id = assistant_result['assistant_id']
-            vector_store_id = assistant_result['vector_store_id']
-            logger.info(f"Successfully created OpenAI assistant: {assistant_id}, vector_store: {vector_store_id}")
+            activity.vector_store_id = documents_result['vector_store_id']
+            logger.info(f"Activity documents ready, vector_store: {activity.vector_store_id}")
         else:
-            logger.info(f"Creating activity with {payload.ai_model} model - no OpenAI assistant needed")
+            logger.info(f"Creating activity with {payload.ai_model} model - no OpenAI documents needed")
         
         activity.save()
 
@@ -629,30 +625,24 @@ def update_activity_api(request, activity_id: str, payload: ActivityUpdateSchema
                     except ValueError:
                         return HTTPStatus.BAD_REQUEST, {"message": "Invalid file format. Expected 'filename:content_type:base64_content'"}
             
-            if activity.openai_assistant_id:
-                assistant_result = openai_assistant.update_assistant(
-                    activity.openai_assistant_id, 
-                    activity_data, 
-                    files_to_upload
-                )
-            else:
-                assistant_result = openai_assistant.create_assistant(activity_data, files_to_upload, user_language)
+            documents_result = openai_assistant.add_activity_documents(
+                activity.vector_store_id,
+                activity_data,
+                files_to_upload
+            )
             
-            if not assistant_result['success']:
-                return HTTPStatus.BAD_REQUEST, {"message": f"Failed to update OpenAI assistant: {assistant_result.get('error', 'Unknown error')}"}
+            if not documents_result['success']:
+                return HTTPStatus.BAD_REQUEST, {"message": f"Failed to upload activity documents: {documents_result.get('error', 'Unknown error')}"}
             
-            activity.openai_assistant_id = assistant_result['assistant_id']
-            activity.vector_store_id = assistant_result['vector_store_id']
+            activity.vector_store_id = documents_result['vector_store_id']
+            # Assistants API is shut down; the ID of a legacy assistant is no longer used
+            activity.openai_assistant_id = None
             
         elif previous_ai_model == 'gpt' and activity.ai_model != 'gpt':
-            if activity.openai_assistant_id:
-                try:
-                    openai_assistant.delete_assistant(activity.openai_assistant_id, activity.vector_store_id)
-                except Exception as e:
-                    logger.warning(f"Failed to clean up OpenAI assistant {activity.openai_assistant_id}: {e}")
-                
-                activity.openai_assistant_id = None
-                activity.vector_store_id = None
+            if activity.vector_store_id:
+                openai_assistant.delete_activity_documents(activity.vector_store_id)
+            activity.openai_assistant_id = None
+            activity.vector_store_id = None
         
         activity.save()
         
@@ -685,6 +675,8 @@ def delete_activity_api(request, activity_id: str, user_id: str):
         if activity.owner_id != user.id and activity.course.owner_id != user.id:
             return HTTPStatus.FORBIDDEN, {"message": "Only the activity owner or course owner can delete this activity."}
         
+        if activity.vector_store_id:
+            openai_assistant.delete_activity_documents(activity.vector_store_id)
         activity.delete()
         deletedActivity(user,activity_id,time.time())
         return HTTPStatus.NO_CONTENT, None
@@ -2478,17 +2470,9 @@ def admin_delete_activity(request, user_id: str, activity_id: str):
         
         activity = Activity.objects.get(id=activity_id)
         
-        # Clean up OpenAI resources if they exist
-        try:
-            from simbaapp.openai_assistant import OpenAIAssistant
-            if activity.openai_assistant_id:
-                openai_assistant = OpenAIAssistant()
-                openai_assistant.delete_assistant(activity.openai_assistant_id)
-                if activity.vector_store_id:
-                    openai_assistant.delete_vector_store(activity.vector_store_id)
-        except Exception as cleanup_error:
-            # Log the error but don't fail the deletion
-            print(f"Warning: Failed to clean up OpenAI resources for activity {activity_id}: {cleanup_error}")
+        # Clean up OpenAI documents if they exist (failures are logged, not raised)
+        if activity.vector_store_id:
+            openai_assistant.delete_activity_documents(activity.vector_store_id)
         
         activity.delete()
         deletedActivity(admin, activity_id, time.time())
