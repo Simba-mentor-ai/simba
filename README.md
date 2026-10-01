@@ -345,6 +345,10 @@ simba-2025/
 - **`scripts/restore.sh`**: Restore database from backup file
 - **`scripts/cron_backup.sh`**: Setup automated daily backups
 
+### Monitoring Scripts
+
+- **`scripts/disk_report.sh`**: Daily disk-space check, run from root's crontab. Emails a full report (who uses the space, upcoming backups, software updates and deploys, growth trend) only when a disk is at or over 80% (critical from 90%); the forecasts are in the report but never send an email on their own. Recipients and thresholds are set at the top of the script; `sudo ./scripts/disk_report.sh --print` shows the report without sending it.
+
 ### Deployment Scripts
 
 - **`deploy.sh`**: Production deployment with SSL and domain configuration
@@ -376,7 +380,22 @@ ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com
 BASE_URL=https://yourdomain.com
 SIMBA_API_URL_PROD=https://yourdomain.com/api
 CHAINLIT_URL_PROD=https://yourdomain.com/chainlit
+
+# Default accounts, required in production (deploy.sh stops before touching the site if
+# they are missing). Passwords: at least 12 characters, not the same as the username.
+# Applied on every start: change a value here, then redeploy or recreate the web container.
+# Put a value in single quotes if it contains a $ sign.
+SIMBA_ADMIN_USERNAME=your-admin-name
+SIMBA_ADMIN_EMAIL=admin@yourdomain.com
+SIMBA_ADMIN_PASSWORD=a-long-random-password
+SIMBA_STUDENT_USERNAME=your-demo-student
+SIMBA_STUDENT_EMAIL=student@yourdomain.com
+SIMBA_STUDENT_PASSWORD=another-long-random-password
 ```
+
+In development these accounts default to `prof`/`prof` and `student`/`student`. In production
+there is no default, and any old `prof` or `student` account that still has its default
+password is locked on start.
 
 ### 3. SSL Configuration
 
