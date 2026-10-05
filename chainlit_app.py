@@ -12,6 +12,7 @@ import requests
 import json
 from typing import Dict, Any, Optional
 from datetime import datetime
+from urllib.parse import urlparse, parse_qs
 from simbaapp.templates import build_system_prompt, get_first_message
 from simbaapp.llm_models import TOGETHER_BASE_URL, DEFAULT_TOGETHER_MODEL, resolve_together_model
 
@@ -144,6 +145,29 @@ async def api_get_messages_for_thread(thread_id: str):
         except httpx.RequestError as e:
             logger.error(f"Request Error getting messages: {e}")
             raise Exception(f"Request Error: Could not connect to API for messages.")
+
+def session_id_from_chat_url():
+    """
+    The activity page opens the chat at <chainlit url>?session=<id> (forceChainlitReload). The browser sends that
+    address as the Referer when the chat connects, and Chainlit keeps it in the user session.
+    Returns the id, or None for a chat opened without one (e.g. a page loaded before this change).
+    """
+    referer = cl.user_session.get("http_referer") or ""
+    values = parse_qs(urlparse(referer).query).get("session")
+    return values[0] if values else None
+
+async def api_get_session_by_id(session_id: str):
+    """Get this chat's own session from the API; None if it doesn't exist or has expired."""
+    async with httpx.AsyncClient() as http_client:
+        try:
+            response = await http_client.get(f"{SIMBA_API_BASE_URL}/chainlit/session/{session_id}")
+            if response.status_code == 200:
+                return response.json()
+            logger.warning(f"Session {session_id} not found or expired: {response.status_code}")
+            return None
+        except httpx.RequestError as e:
+            logger.error(f"Request Error getting session {session_id}: {e}")
+            raise Exception("Request Error: Could not connect to API for the session.")
 
 async def api_get_next_session():
     """Get the next pending session from the API queue"""
@@ -333,31 +357,49 @@ async def api_get_next_session():
 #         system_prompt += "\n\nDo not provide questions to the student unless explicitly asked."
 #     return system_prompt
 
-@cl.on_chat_start
-async def on_chat_start():
-    logger.info("Chainlit starting new chat session")
-    
-    # Try to get the next session from the API queue with retry
-    session_data = None
+async def next_waiting_session():
+    """The old way: the oldest waiting session of any student, with retries. Only for chats without a session id."""
     max_retries = 3
     retry_delay = 0.5  # seconds
-    
+
     for attempt in range(max_retries):
         try:
             session_data = await api_get_next_session()
-            
+
             if session_data:
-                break
+                return session_data
             else:
                 logger.info(f"No pending sessions found on attempt {attempt + 1}")
                 if attempt < max_retries - 1:
                     await asyncio.sleep(retry_delay)
-                    
+
         except Exception as e:
             logger.error(f"Error getting session data from API on attempt {attempt + 1}: {e}")
             if attempt < max_retries - 1:
                 await asyncio.sleep(retry_delay)
-    
+    return None
+
+@cl.on_chat_start
+async def on_chat_start():
+    logger.info("Chainlit starting new chat session")
+
+    # Get this chat's own session, by the id the activity page put in the chat's address. The fallback below
+    # (the oldest waiting session of ANY student) is only for chats opened without an id: with several students
+    # opening chats at once it hands out other students' sessions.
+    session_data = None
+    own_session_id = session_id_from_chat_url()
+    if own_session_id:
+        try:
+            session_data = await api_get_session_by_id(own_session_id)
+        except Exception as e:
+            logger.error(f"Error getting session {own_session_id}: {e}")
+        if not session_data:
+            await cl.Message(content="This chat session has expired. Please start the chat again from the course page.").send()
+            return
+    else:
+        logger.warning("Chat opened without a session id, falling back to the next waiting session")
+        session_data = await next_waiting_session()
+
     if not session_data:
         logger.warning("No pending sessions found after all retry attempts")
         await cl.Message(content="No chat session is currently available. Please try starting a new chat from the course page.").send()

@@ -1881,7 +1881,13 @@ def get_chainlit_session(request, session_id: str):
             session_id=session_id,
             expires_at__gt=timezone.now()
         )
-        
+
+        # Taken by its own chat window: make sure /next-session never hands it to another student.
+        # It can still be fetched again by id (e.g. when the chat window reloads) until it expires.
+        if not chainlit_session.is_consumed:
+            chainlit_session.is_consumed = True
+            chainlit_session.save(update_fields=['is_consumed'])
+
         return HTTPStatus.OK, chainlit_session.session_data
         
     except ChainlitSession.DoesNotExist:
