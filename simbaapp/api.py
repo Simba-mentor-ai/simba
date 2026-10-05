@@ -57,7 +57,6 @@ from .eventTracking import (
     deletedCourse,
     joinedActivity,
     joinedCourse,
-    loggedIn,
     loggedOut,
     modifiedActivity,
     modifiedCourse,
@@ -67,6 +66,7 @@ from .eventTracking import (
     sentMessage 
 )
 from .email_utils import send_email_verification, send_password_reset_email
+from .services import authenticate_user
 import time
 import logging
 
@@ -128,27 +128,9 @@ def register_user(request, payload: UserRegisterSchema):
 def login_user(request, payload: SignInSchema):
     """
     Authenticate a user and return user details.
+    The login page calls services.authenticate_user directly; this endpoint stays for other callers.
     """
-    try:
-        user = User.objects.get(username=payload.username)
-        if check_password(payload.password, user.password_hash):
-            if not user.is_email_verified:
-                return HTTPStatus.UNAUTHORIZED, {"message": "Please verify your email address before logging in."}
-            
-            loggedIn(user, time.time())
-            
-            user_data = {
-                "id": str(user.id),
-                "username": user.username,
-                "email": user.email
-            }
-            return HTTPStatus.OK, user_data
-        else:
-            return HTTPStatus.UNAUTHORIZED, {"message": "Invalid credentials."}
-    except User.DoesNotExist:
-        return HTTPStatus.NOT_FOUND, {"message": "User does not exist."}
-    except Exception as e:
-         return HTTPStatus.INTERNAL_SERVER_ERROR, {"message": f"Login failed: {str(e)}"}
+    return authenticate_user(payload.username, payload.password)
 
 @api.post("/auth/verify-email", response={200: dict, 400: ErrorSchema, 404: ErrorSchema})
 def verify_email(request, payload: EmailVerificationSchema):
