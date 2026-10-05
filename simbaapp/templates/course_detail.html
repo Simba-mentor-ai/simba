@@ -301,7 +301,11 @@ document.addEventListener('DOMContentLoaded', function() {
         chainlitFrame.src = 'about:blank';
 
         // Wait a moment then load the chat with this student's session id: Chainlit fetches exactly that
-        // session, instead of the oldest waiting one, which could belong to another student
+        // session, instead of the oldest waiting one, which could belong to another student.
+        // Also as a short-lived cookie: on the live site (chat under /chainlit/) the ?session= part of the
+        // address does not reach Chainlit, but the browser sends this cookie with the chat's connection.
+        document.cookie = 'simba_chat_session=' + encodeURIComponent(sessionId) + '; path=/; max-age=3600; SameSite=Lax'
+            + (location.protocol === 'https:' ? '; Secure' : '');
         const chatUrl = '{{ chainlit_url }}';
         setTimeout(() => {
             chainlitFrame.src = chatUrl + (chatUrl.includes('?') ? '&' : '?') + 'session=' + encodeURIComponent(sessionId);

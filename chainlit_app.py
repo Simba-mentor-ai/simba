@@ -12,7 +12,8 @@ import requests
 import json
 from typing import Dict, Any, Optional
 from datetime import datetime
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, unquote
+from http.cookies import SimpleCookie, CookieError
 from simbaapp.templates import build_system_prompt, get_first_message
 from simbaapp.llm_models import TOGETHER_BASE_URL, DEFAULT_TOGETHER_MODEL, resolve_together_model
 
@@ -146,15 +147,28 @@ async def api_get_messages_for_thread(thread_id: str):
             logger.error(f"Request Error getting messages: {e}")
             raise Exception(f"Request Error: Could not connect to API for messages.")
 
-def session_id_from_chat_url():
+def session_id_from_browser():
     """
-    The activity page opens the chat at <chainlit url>?session=<id> (forceChainlitReload). The browser sends that
-    address as the Referer when the chat connects, and Chainlit keeps it in the user session.
+    The activity page passes this chat's session id two ways (forceChainlitReload): in the chat's address
+    (?session=<id>, which Chainlit sees as the Referer of the chat's connection) and in the short-lived cookie
+    simba_chat_session. On the live site, where the chat runs under /chainlit/, the address part does not
+    arrive; the cookie is sent with the chat's connection either way.
     Returns the id, or None for a chat opened without one (e.g. a page loaded before this change).
     """
     referer = cl.user_session.get("http_referer") or ""
     values = parse_qs(urlparse(referer).query).get("session")
-    return values[0] if values else None
+    if values:
+        logger.info("Session id taken from the chat's address")
+        return values[0]
+    cookies = SimpleCookie()
+    try:
+        cookies.load(cl.user_session.get("http_cookie") or "")
+    except CookieError as e:
+        logger.warning(f"Could not read the chat's cookies: {e}")
+    if "simba_chat_session" in cookies:
+        logger.info("Session id taken from the simba_chat_session cookie")
+        return unquote(cookies["simba_chat_session"].value)
+    return None
 
 async def api_get_session_by_id(session_id: str):
     """Get this chat's own session from the API; None if it doesn't exist or has expired."""
@@ -387,7 +401,7 @@ async def on_chat_start():
     # (the oldest waiting session of ANY student) is only for chats opened without an id: with several students
     # opening chats at once it hands out other students' sessions.
     session_data = None
-    own_session_id = session_id_from_chat_url()
+    own_session_id = session_id_from_browser()
     if own_session_id:
         try:
             session_data = await api_get_session_by_id(own_session_id)
