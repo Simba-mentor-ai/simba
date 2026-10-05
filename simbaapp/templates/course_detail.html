@@ -294,15 +294,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const backToActivitiesBtn = document.getElementById('back-to-activities');
     
     // Function to force complete iframe reload (clears Chainlit session)
-    function forceChainlitReload() {
+    function forceChainlitReload(sessionId) {
         console.log('Reloading Chainlit iframe');
-        
+
         // First clear the iframe
         chainlitFrame.src = 'about:blank';
-        
-        // Wait a moment then load the base URL
+
+        // Wait a moment then load the chat with this student's session id: Chainlit fetches exactly that
+        // session, instead of the oldest waiting one, which could belong to another student
+        const chatUrl = '{{ chainlit_url }}';
         setTimeout(() => {
-            chainlitFrame.src = '{{ chainlit_url }}';
+            chainlitFrame.src = chatUrl + (chatUrl.includes('?') ? '&' : '?') + 'session=' + encodeURIComponent(sessionId);
         }, 200);
     }
     
@@ -340,8 +342,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const sessionData = await response.json();
             console.log('Session created successfully:', sessionData);
             
-            // Load Chainlit iframe with base URL (no parameters)
-            forceChainlitReload();
+            // Load Chainlit iframe with this session's id
+            forceChainlitReload(sessionData.session_id);
             
         } catch (error) {
             console.error('Error creating session:', error);
