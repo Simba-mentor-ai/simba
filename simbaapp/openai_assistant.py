@@ -1,8 +1,7 @@
 import os
 import base64
-import tempfile
 from datetime import datetime
-from openai import OpenAI, NotFoundError
+from openai import OpenAI
 from typing import List, Dict, Any, Optional
 import logging
 from .templates import build_system_prompt
@@ -135,206 +134,93 @@ client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
     
 #     return system_prompt
 
-def create_assistant(activity_data: Dict[str, Any], files: List[Dict[str, Any]] = None, language: str = "en") -> Dict[str, Any]:
-    """Create a new OpenAI assistant for an activity"""
+# The Assistants API was shut down on Aug 26, 2026. Activity documents now live in a
+# vector store that the chat searches with the Responses API `file_search` tool
+# (see chainlit_app.py), so there is no assistant object to create or update.
+
+def _upload_files(vector_store_id: str, files: List[Dict[str, Any]]) -> None:
+    """Upload files and wait until the vector store has indexed them."""
+    for file_data in files:
+        file_content = base64.b64decode(file_data['content'])
+
+        # Passing (filename, bytes) keeps the teacher's original filename
+        file_obj = client.files.create(
+            file=(file_data['filename'], file_content),
+            purpose="assistants"
+        )
+
+        vs_file = client.vector_stores.files.create_and_poll(
+            vector_store_id=vector_store_id,
+            file_id=file_obj.id
+        )
+        if vs_file.status != 'completed':
+            raise RuntimeError(f"Indexing {file_data['filename']} failed: {vs_file.last_error}")
+
+def create_activity_documents(activity_data: Dict[str, Any], files: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Create a vector store holding an activity's documents. No files -> no vector store."""
+    vector_store_id = None
     try:
-        instructions = build_system_prompt(activity_data, logger, language)
-        
-        vector_store_id = None
         if files:
             vector_store = client.vector_stores.create(
                 name=f"Activity: {activity_data.get('title', 'Untitled')}"
             )
             vector_store_id = vector_store.id
-            
-            for file_data in files:
-                file_content = base64.b64decode(file_data['content'])
-                
-                with tempfile.NamedTemporaryFile(
-                    suffix=f"_{file_data['filename']}", 
-                    delete=False
-                ) as temp_file:
-                    temp_file.write(file_content)
-                    temp_file_path = temp_file.name
-                
-                try:
-                    with open(temp_file_path, 'rb') as f:
-                        file_obj = client.files.create(
-                            file=f,
-                            purpose="assistants"
-                        )
-                    
-                    client.vector_stores.files.create(
-                        vector_store_id=vector_store_id,
-                        file_id=file_obj.id
-                    )
-                    
-                finally:
-                    os.unlink(temp_file_path)
-        
-        tool_resources = {}
-        if vector_store_id:
-            tool_resources = {"file_search": {"vector_store_ids": [vector_store_id]}}
-        
-        metadata = {}
-        if activity_data.get('start_date'):
-            metadata['startDate'] = activity_data['start_date'].strftime("%Y/%m/%d")
-        if activity_data.get('end_date'):
-            metadata['endDate'] = activity_data['end_date'].strftime("%Y/%m/%d")
-        
-        assistant = client.beta.assistants.create(
-            name=activity_data.get('title', 'SIMBA Activity'),
-            description=activity_data.get('description', ''),
-            instructions=instructions,
-            tools=[{"type": "file_search"}],
-            model="gpt-4o-mini",
-            tool_resources=tool_resources,
-            metadata=metadata
-        )
-        
+            _upload_files(vector_store_id, files)
+
         return {
-            'assistant_id': assistant.id,
             'vector_store_id': vector_store_id,
             'success': True
         }
-        
+
     except Exception as e:
-        detail = getattr(e, 'body', None) or getattr(e, 'message', None) or str(e)
-        logger.error(f"Error creating OpenAI assistant: {str(e)} | detail={detail}")
+        logger.error(f"Error creating activity documents: {str(e)}")
+        if vector_store_id:
+            delete_activity_documents(vector_store_id)
         return {
-            'assistant_id': None,
             'vector_store_id': None,
             'success': False,
             'error': str(e)
         }
 
-def update_assistant(assistant_id: str, activity_data: Dict[str, Any], files: List[Dict[str, Any]] = None, language = "en") -> Dict[str, Any]:
-    """Update an existing OpenAI assistant"""
+def add_activity_documents(vector_store_id: Optional[str], activity_data: Dict[str, Any], files: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Add files to an activity's vector store, creating the store if it doesn't exist yet."""
+    if not vector_store_id:
+        return create_activity_documents(activity_data, files)
     try:
-        assistant = client.beta.assistants.retrieve(assistant_id)
-    except NotFoundError:
-        # L'assistant stocké en base n'existe plus sous la clé API actuellement
-        # configurée (clé changée/tournée entre environnements, ou assistant
-        # supprimé côté OpenAI). Plutôt que d'échouer la mise à jour, on
-        # recrée un assistant neuf avec les mêmes réglages, et on renvoie son
-        # nouvel id pour que l'appelant (update_activity_api) le sauvegarde.
-        logger.warning(
-            f"OpenAI assistant {assistant_id} introuvable (404) sous la clé API "
-            f"actuelle — recréation d'un nouvel assistant pour cette activité."
-        )
-        return create_assistant(activity_data, files, language)
-
-    try:
-        vector_store_id = None
-        if hasattr(assistant.tool_resources, 'file_search') and assistant.tool_resources.file_search:
-            if assistant.tool_resources.file_search.vector_store_ids:
-                vector_store_id = assistant.tool_resources.file_search.vector_store_ids[0]
-        
-
-        instructions = build_system_prompt(activity_data, logger, language)
-        
         if files:
-            if not vector_store_id:
-                vector_store = client.vector_stores.create(
-                    name=f"Activity: {activity_data.get('title', 'Untitled')}"
-                )
-                vector_store_id = vector_store.id
-            
-            for file_data in files:
-                file_content = base64.b64decode(file_data['content'])
-                
-                with tempfile.NamedTemporaryFile(
-                    suffix=f"_{file_data['filename']}", 
-                    delete=False
-                ) as temp_file:
-                    temp_file.write(file_content)
-                    temp_file_path = temp_file.name
-                
-                try:
-                    with open(temp_file_path, 'rb') as f:
-                        file_obj = client.files.create(
-                            file=f,
-                            purpose="assistants"
-                        )
-                    
-                    client.vector_stores.files.create(
-                        vector_store_id=vector_store_id,
-                        file_id=file_obj.id
-                    )
-                    
-                finally:
-                    os.unlink(temp_file_path)
-        
-        metadata = {}
-        if activity_data.get('start_date'):
-            metadata['startDate'] = activity_data['start_date'].strftime("%Y/%m/%d")
-        if activity_data.get('end_date'):
-            metadata['endDate'] = activity_data['end_date'].strftime("%Y/%m/%d")
-        
-        tool_resources = {}
-        if vector_store_id:
-            tool_resources = {"file_search": {"vector_store_ids": [vector_store_id]}}
-        
-        updated_assistant = client.beta.assistants.update(
-            assistant_id=assistant_id,
-            name=activity_data.get('title', 'SIMBA Activity'),
-            description=activity_data.get('description', ''),
-            instructions=instructions,
-            tool_resources=tool_resources,
-            metadata=metadata
-        )
-        
+            _upload_files(vector_store_id, files)
         return {
-            'assistant_id': updated_assistant.id,
             'vector_store_id': vector_store_id,
             'success': True
         }
-        
-    except NotFoundError:
-        # Le retrieve() initial a réussi mais l'update() échoue en 404 (rare,
-        # ex. assistant supprimé entre les deux appels) — même filet de
-        # sécurité : on recrée plutôt que d'échouer.
-        logger.warning(
-            f"OpenAI assistant {assistant_id} disparu pendant la mise à jour — "
-            f"recréation d'un nouvel assistant pour cette activité."
-        )
-        return create_assistant(activity_data, files, language)
+
     except Exception as e:
-        detail = getattr(e, 'body', None) or getattr(e, 'message', None) or str(e)
-        logger.error(f"Error updating OpenAI assistant: {str(e)} | detail={detail}")
+        logger.error(f"Error adding activity documents: {str(e)}")
         return {
-            'assistant_id': None,
-            'vector_store_id': None,
+            'vector_store_id': vector_store_id,
             'success': False,
             'error': str(e)
         }
 
-def delete_assistant(assistant_id: str, vector_store_id: str = None) -> Dict[str, Any]:
-    """Delete an OpenAI assistant and its associated resources"""
+def delete_activity_documents(vector_store_id: str) -> Dict[str, Any]:
+    """Delete an activity's vector store and the files in it."""
     try:
-        if vector_store_id:
+        files = client.vector_stores.files.list(vector_store_id=vector_store_id)
+
+        for file in files:
             try:
-                files = client.vector_stores.files.list(vector_store_id=vector_store_id)
-                
-                for file in files:
-                    try:
-                        client.files.delete(file.id)
-                    except Exception as e:
-                        logger.warning(f"Could not delete file {file.id}: {str(e)}")
-                
-                client.vector_stores.delete(vector_store_id)
-                
+                client.files.delete(file.id)
             except Exception as e:
-                logger.warning(f"Could not delete vector store {vector_store_id}: {str(e)}")
-        
-        client.beta.assistants.delete(assistant_id)
-        
+                logger.warning(f"Could not delete file {file.id}: {str(e)}")
+
+        client.vector_stores.delete(vector_store_id)
+
         return {
             'success': True
         }
-        
+
     except Exception as e:
-        logger.error(f"Error deleting OpenAI assistant: {str(e)}")
+        logger.warning(f"Could not delete vector store {vector_store_id}: {str(e)}")
         return {
             'success': False,
             'error': str(e)
@@ -392,35 +278,25 @@ def upload_file_to_assistant(vector_store_id: str, file_data: Dict[str, Any]) ->
     """Upload a new file to an existing assistant's vector store"""
     try:
         file_content = base64.b64decode(file_data['content'])
-        
-        with tempfile.NamedTemporaryFile(
-            suffix=f"_{file_data['filename']}", 
-            delete=False
-        ) as temp_file:
-            temp_file.write(file_content)
-            temp_file_path = temp_file.name
-        
-        try:
-            with open(temp_file_path, 'rb') as f:
-                file_obj = client.files.create(
-                    file=f,
-                    purpose="assistants"
-                )
-            
-            client.vector_stores.files.create(
-                vector_store_id=vector_store_id,
-                file_id=file_obj.id
-            )
-            
-            return {
-                'success': True,
-                'file_id': file_obj.id,
-                'filename': file_obj.filename,
-                'size': file_obj.bytes
-            }
-            
-        finally:
-            os.unlink(temp_file_path)
+
+        file_obj = client.files.create(
+            file=(file_data['filename'], file_content),
+            purpose="assistants"
+        )
+
+        vs_file = client.vector_stores.files.create_and_poll(
+            vector_store_id=vector_store_id,
+            file_id=file_obj.id
+        )
+        if vs_file.status != 'completed':
+            raise RuntimeError(f"Indexing failed: {vs_file.last_error}")
+
+        return {
+            'success': True,
+            'file_id': file_obj.id,
+            'filename': file_obj.filename,
+            'size': file_obj.bytes
+        }
             
     except Exception as e:
         logger.error(f"Error uploading file to assistant: {str(e)}")

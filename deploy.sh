@@ -77,6 +77,36 @@ if [ ! -f $ENV_FILE ]; then
     exit 1
 fi
 
+# entrypoint.sh creates the admin and student accounts from these settings and refuses missing or
+# weak ones (same rules as here). Check now, while the current version is still running, so a
+# deploy never ends with no admin account. Values are never printed or logged.
+print_step "Checking the admin and student account settings in $ENV_FILE..."
+env_value() {
+    grep -E "^$1=" "$ENV_FILE" | tail -n 1 | cut -d= -f2- | tr -d '\r' | sed -e "s/^['\"]//" -e "s/['\"]$//"
+}
+ACCOUNT_ERRORS=0
+for PREFIX in SIMBA_ADMIN SIMBA_STUDENT; do
+    ACCOUNT_USERNAME=$(env_value "${PREFIX}_USERNAME")
+    ACCOUNT_EMAIL=$(env_value "${PREFIX}_EMAIL")
+    ACCOUNT_PASSWORD=$(env_value "${PREFIX}_PASSWORD")
+    if [ -z "$ACCOUNT_USERNAME" ] || [ -z "$ACCOUNT_EMAIL" ] || [ -z "$ACCOUNT_PASSWORD" ]; then
+        print_error "${PREFIX}_USERNAME, ${PREFIX}_EMAIL and ${PREFIX}_PASSWORD must all be set in $ENV_FILE"
+        ACCOUNT_ERRORS=1
+    elif [[ "$ACCOUNT_EMAIL" != *@* ]]; then
+        print_error "${PREFIX}_EMAIL is not an email address"
+        ACCOUNT_ERRORS=1
+    elif [ ${#ACCOUNT_PASSWORD} -lt 12 ] || [ "${ACCOUNT_PASSWORD,,}" = "${ACCOUNT_USERNAME,,}" ]; then
+        print_error "${PREFIX}_PASSWORD is too weak (under 12 characters or same as the username)"
+        ACCOUNT_ERRORS=1
+    fi
+done
+unset ACCOUNT_PASSWORD
+if [ $ACCOUNT_ERRORS -ne 0 ]; then
+    print_error "Nothing was stopped, the site still runs the current version. Fix $ENV_FILE (see README, Production Environment Variables) and run deploy.sh again."
+    exit 1
+fi
+print_success "Admin and student account settings are present"
+
 print_step "Creating database backup (if exists)..."
 if docker ps | grep -q "simba.*db"; then
     ./scripts/backup.sh || print_warning "Backup failed or no existing database"

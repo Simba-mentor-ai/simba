@@ -11,6 +11,8 @@ import os
 from django.http import HttpResponseForbidden
 from django.utils import timezone
 from django.utils.translation import activate
+from http import HTTPStatus
+from .services import authenticate_user
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,35 +35,20 @@ def login_view(request):
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
-        
-        api_url = request.build_absolute_uri(reverse('api-1.0.0:login_user')) 
-        
-        try:
-            response = requests.post(api_url, json={
-                'username': username,
-                'password': password
-            })
-            response.raise_for_status() 
-            
-            user_data = response.json()
-            
+
+        # Checked directly, not through our own /api/auth/login over HTTP: that call needed a second Gunicorn
+        # worker for every login, and 4 simultaneous logins froze the whole site (see services.py).
+        status, user_data = authenticate_user(username, password)
+        if status == HTTPStatus.OK:
             request.session['user_id'] = user_data['id']
             request.session['username'] = user_data['username']
-            
+
             # Add one-time login success message
             request.session['show_login_success'] = True
-            
+
             return redirect('courses')
-            
-        except requests.exceptions.RequestException as e:
-            messages.error(request, f"Login request failed: {e}")
-            try:
-                error_data = e.response.json()
-                messages.error(request, f"API Error: {error_data.get('message', 'Unknown error')}")
-            except (AttributeError, ValueError, TypeError):
-                 messages.error(request, "An unexpected error occurred during login.")
-        except Exception as e:
-             messages.error(request, f"An unexpected error occurred: {str(e)}")
+
+        messages.error(request, f"API Error: {user_data.get('message', 'Unknown error')}")
 
     return render(request, 'login.html')
 
@@ -663,6 +650,7 @@ def create_activity_view(request, course_id):
             "is_visible": request.POST.get('is_visible') == 'on',
             "allow_redo": request.POST.get('allow_redo') == 'on',
             "ai_model": request.POST.get('ai_model', 'mistral'),
+            "llm_model": request.POST.get('llm_model') or None,
             "files": files_data,
             "options" : {"language" : userLanguage}
         }

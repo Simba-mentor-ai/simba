@@ -1,7 +1,7 @@
 import os
 import django
 import django.apps
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, NotFoundError, BadRequestError
 from mistralai import Mistral
 import chainlit as cl
 import logging
@@ -12,7 +12,10 @@ import requests
 import json
 from typing import Dict, Any, Optional
 from datetime import datetime
+from urllib.parse import urlparse, parse_qs, unquote
+from http.cookies import SimpleCookie, CookieError
 from simbaapp.templates import build_system_prompt, get_first_message
+from simbaapp.llm_models import TOGETHER_BASE_URL, DEFAULT_TOGETHER_MODEL, resolve_together_model
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +37,8 @@ if not django.apps.apps.ready:
 
 openai_client = AsyncOpenAI()
 mistral_client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
+# Empty-string fallback stops the OpenAI SDK from sending OPENAI_API_KEY to Together
+together_client = AsyncOpenAI(api_key=os.getenv("TOGETHER_API_KEY", ""), base_url=TOGETHER_BASE_URL)
 
 # Default settings for different models
 openai_settings = {
@@ -46,6 +51,35 @@ mistral_settings = {
     "temperature": 0.7,
     "max_tokens": 1000,
 }
+
+together_settings = {
+    "temperature": 0.7,
+    # Reasoning models (e.g. gpt-oss) spend part of this budget thinking
+    "max_tokens": 4096,
+}
+
+async def together_chat(model: str, messages: list):
+    """Call Together AI. If the model has been retired, retry once with the default model.
+    Returns (response_text, model_used)."""
+    try:
+        response = await together_client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=together_settings["temperature"],
+            max_tokens=together_settings["max_tokens"],
+        )
+    except (NotFoundError, BadRequestError) as e:
+        if model == DEFAULT_TOGETHER_MODEL or "model" not in str(e).lower():
+            raise
+        logger.warning(f"Together model {model} unavailable ({e}), falling back to {DEFAULT_TOGETHER_MODEL}")
+        model = DEFAULT_TOGETHER_MODEL
+        response = await together_client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=together_settings["temperature"],
+            max_tokens=together_settings["max_tokens"],
+        )
+    return response.choices[0].message.content, model
 
 async def api_get_activity(activity_id: str):
     """Get activity data from the API."""
@@ -112,6 +146,42 @@ async def api_get_messages_for_thread(thread_id: str):
         except httpx.RequestError as e:
             logger.error(f"Request Error getting messages: {e}")
             raise Exception(f"Request Error: Could not connect to API for messages.")
+
+def session_id_from_browser():
+    """
+    The activity page passes this chat's session id two ways (forceChainlitReload): in the chat's address
+    (?session=<id>, which Chainlit sees as the Referer of the chat's connection) and in the short-lived cookie
+    simba_chat_session. On the live site, where the chat runs under /chainlit/, the address part does not
+    arrive; the cookie is sent with the chat's connection either way.
+    Returns the id, or None for a chat opened without one (e.g. a page loaded before this change).
+    """
+    referer = cl.user_session.get("http_referer") or ""
+    values = parse_qs(urlparse(referer).query).get("session")
+    if values:
+        logger.info("Session id taken from the chat's address")
+        return values[0]
+    cookies = SimpleCookie()
+    try:
+        cookies.load(cl.user_session.get("http_cookie") or "")
+    except CookieError as e:
+        logger.warning(f"Could not read the chat's cookies: {e}")
+    if "simba_chat_session" in cookies:
+        logger.info("Session id taken from the simba_chat_session cookie")
+        return unquote(cookies["simba_chat_session"].value)
+    return None
+
+async def api_get_session_by_id(session_id: str):
+    """Get this chat's own session from the API; None if it doesn't exist or has expired."""
+    async with httpx.AsyncClient() as http_client:
+        try:
+            response = await http_client.get(f"{SIMBA_API_BASE_URL}/chainlit/session/{session_id}")
+            if response.status_code == 200:
+                return response.json()
+            logger.warning(f"Session {session_id} not found or expired: {response.status_code}")
+            return None
+        except httpx.RequestError as e:
+            logger.error(f"Request Error getting session {session_id}: {e}")
+            raise Exception("Request Error: Could not connect to API for the session.")
 
 async def api_get_next_session():
     """Get the next pending session from the API queue"""
@@ -301,31 +371,49 @@ async def api_get_next_session():
 #         system_prompt += "\n\nDo not provide questions to the student unless explicitly asked."
 #     return system_prompt
 
-@cl.on_chat_start
-async def on_chat_start():
-    logger.info("Chainlit starting new chat session")
-    
-    # Try to get the next session from the API queue with retry
-    session_data = None
+async def next_waiting_session():
+    """The old way: the oldest waiting session of any student, with retries. Only for chats without a session id."""
     max_retries = 3
     retry_delay = 0.5  # seconds
-    
+
     for attempt in range(max_retries):
         try:
             session_data = await api_get_next_session()
-            
+
             if session_data:
-                break
+                return session_data
             else:
                 logger.info(f"No pending sessions found on attempt {attempt + 1}")
                 if attempt < max_retries - 1:
                     await asyncio.sleep(retry_delay)
-                    
+
         except Exception as e:
             logger.error(f"Error getting session data from API on attempt {attempt + 1}: {e}")
             if attempt < max_retries - 1:
                 await asyncio.sleep(retry_delay)
-    
+    return None
+
+@cl.on_chat_start
+async def on_chat_start():
+    logger.info("Chainlit starting new chat session")
+
+    # Get this chat's own session, by the id the activity page put in the chat's address. The fallback below
+    # (the oldest waiting session of ANY student) is only for chats opened without an id: with several students
+    # opening chats at once it hands out other students' sessions.
+    session_data = None
+    own_session_id = session_id_from_browser()
+    if own_session_id:
+        try:
+            session_data = await api_get_session_by_id(own_session_id)
+        except Exception as e:
+            logger.error(f"Error getting session {own_session_id}: {e}")
+        if not session_data:
+            await cl.Message(content="This chat session has expired. Please start the chat again from the course page.").send()
+            return
+    else:
+        logger.warning("Chat opened without a session id, falling back to the next waiting session")
+        session_data = await next_waiting_session()
+
     if not session_data:
         logger.warning("No pending sessions found after all retry attempts")
         cl.user_session.set("session_ready", False)
@@ -389,6 +477,18 @@ async def on_chat_start():
                 await api_create_message(thread_id, ai_first_response_content, "assistant", user_id, model_name=mistral_settings["model"])
                 await cl.Message(content=ai_first_response_content).send()
                 logger.info(f"Created initial Mistral message for new thread {thread_id}")
+            elif ai_model == 'together':
+                together_model = resolve_together_model(activity_data.get('llm_model'))
+                if fixedFirst :
+                    ai_first_response_content = get_first_message(activity_data, logger, language_code)
+                else :
+                    ai_first_response_content, together_model = await together_chat(
+                        together_model, [{"role": "system", "content": system_prompt_content}]
+                    )
+
+                await api_create_message(thread_id, ai_first_response_content, "assistant", user_id, model_name=together_model)
+                await cl.Message(content=ai_first_response_content).send()
+                logger.info(f"Created initial Together message ({together_model}) for new thread {thread_id}")
             else:
 
                 # openai_thread_id = cl.user_session.get("openai_thread_id")
@@ -494,124 +594,79 @@ async def on_message(message: cl.Message):
                 logger.error(f"Mistral AI Error: {e}")
                 thinking_msg.content = f"I apologize, but I'm having trouble processing your request right now. Please try again in a moment. Error: {str(e)}"
                 await thinking_msg.update()
-        
-        else:
-            openai_assistant_id = activity_data.get('openai_assistant_id')
-            vector_store_id = activity_data.get('vector_store_id')
-            
-            logger.info(f"GPT model - Assistant ID: {openai_assistant_id}, Vector Store: {vector_store_id}")
-            
-            if openai_assistant_id:
-                try:
-                    logger.info(f"Using OpenAI Assistant API with assistant {openai_assistant_id}")
-                    openai_thread_id = cl.user_session.get("openai_thread_id")
-                    if not openai_thread_id:
-                        openai_thread = await openai_client.beta.threads.create()
-                        openai_thread_id = openai_thread.id
-                        cl.user_session.set("openai_thread_id", openai_thread_id)
-                        logger.info(f"Created new OpenAI thread: {openai_thread_id}")
 
-                        messages_history = await api_get_messages_for_thread(thread_id)
-                        if messages_history:
-                            logger.info(f"Populating OpenAI thread with {len(messages_history)} existing messages")
-                            for msg in messages_history:
-                                msg_role = msg['role'] if msg['role'] in ['user', 'assistant'] else 'user'
-                                await openai_client.beta.threads.messages.create(
-                                    thread_id=openai_thread_id,
-                                    role=msg_role,
-                                    content=msg['content']
-                                )
-                            logger.info(f"Successfully populated OpenAI thread with message history")
-                    
-                    await openai_client.beta.threads.messages.create(
-                        thread_id=openai_thread_id,
-                        role="user",
-                        content=message.content
-                    )
-                    
-                    run = await openai_client.beta.threads.runs.create(
-                        thread_id=openai_thread_id,
-                        assistant_id=openai_assistant_id
-                    )
-                    
-                    # Wait for completion with timeout
-                    max_attempts = 30  # 30 seconds timeout
-                    attempts = 0
-                    while run.status in ['queued', 'in_progress'] and attempts < max_attempts:
-                        await asyncio.sleep(1)
-                        attempts += 1
-                        run = await openai_client.beta.threads.runs.retrieve(
-                            thread_id=openai_thread_id,
-                            run_id=run.id
-                        )
-                        logger.info(f"Run status: {run.status} (attempt {attempts})")
-                    
-                    if run.status == 'completed':
-                        messages = await openai_client.beta.threads.messages.list(
-                            thread_id=openai_thread_id,
-                            limit=1
-                        )
-                        
-                        if messages.data:
-                            latest_message = messages.data[0]
-                            if latest_message.content:
-                                ai_response_content = latest_message.content[0].text.value
-                                
-                                await api_create_message(thread_id, ai_response_content, "assistant", user_id, model_name="gpt-4o-mini")
-                                
-                                thinking_msg.content = ai_response_content
-                                await thinking_msg.update()
-                                logger.info(f"Assistant response sent successfully")
-                            else:
-                                logger.error("Assistant message has no content")
-                                thinking_msg.content = "I apologize, but I couldn't generate a response. Please try again."
-                                await thinking_msg.update()
-                        else:
-                            logger.error("No messages returned from assistant")
-                            thinking_msg.content = "I apologize, but I couldn't retrieve the response. Please try again."
-                            await thinking_msg.update()
-                    elif run.status == 'failed':
-                        logger.error(f"OpenAI run failed: {run.last_error}")
-                        thinking_msg.content = "I apologize, but I encountered an error processing your request. Please try again."
-                        await thinking_msg.update()
-                    elif attempts >= max_attempts:
-                        logger.error(f"OpenAI run timed out after {max_attempts} seconds")
-                        thinking_msg.content = "I apologize, but the request is taking too long. Please try again."
-                        await thinking_msg.update()
-                    else:
-                        logger.error(f"OpenAI run failed with status: {run.status}")
-                        thinking_msg.content = "I apologize, but I encountered an error processing your request. Please try again."
-                        await thinking_msg.update()
-                        
-                except Exception as e:
-                    logger.error(f"OpenAI Assistant API Error: {e}")
-                    thinking_msg.content = f"I apologize, but I'm having trouble processing your request right now. Please try again in a moment. Error: {str(e)}"
-                    await thinking_msg.update()
-                    
-            else:
-                logger.info("No OpenAI assistant available - using legacy chat completions mode")
-                
+        elif ai_model == 'together':
+            try:
+                together_model = resolve_together_model(activity_data.get('llm_model'))
                 language_code = cl.user_session.get("language", "en")
                 system_prompt_content = build_system_prompt(activity_data, logger, language_code)
-                
+
                 messages_history_data = await api_get_messages_for_thread(thread_id)
-                openai_messages = [{"role": "system", "content": system_prompt_content}]
+                together_messages = [{"role": "system", "content": system_prompt_content}]
 
                 for msg_data in messages_history_data:
-                    openai_role = msg_data['role'] if msg_data['role'] in ["assistant", "user"] else "user" 
-                    openai_messages.append({"role": openai_role, "content": msg_data['content']})
-                    
-                response = await openai_client.chat.completions.create(
+                    together_role = msg_data['role'] if msg_data['role'] in ["assistant", "user"] else "user"
+                    together_messages.append({"role": together_role, "content": msg_data['content']})
+
+                ai_response_content, together_model = await together_chat(together_model, together_messages)
+                if not ai_response_content:
+                    logger.error(f"Together model {together_model} returned an empty response")
+                    thinking_msg.content = "I apologize, but I couldn't generate a response. Please try again."
+                    await thinking_msg.update()
+                    return
+
+                await api_create_message(thread_id, ai_response_content, "assistant", user_id, model_name=together_model)
+                thinking_msg.content = ai_response_content
+                await thinking_msg.update()
+
+            except Exception as e:
+                logger.error(f"Together AI Error: {e}")
+                thinking_msg.content = f"I apologize, but I'm having trouble processing your request right now. Please try again in a moment. Error: {str(e)}"
+                await thinking_msg.update()
+        
+        else:
+            # Assistants API is shut down (Aug 2026): use the Responses API, with
+            # file_search over the activity's vector store when it has documents.
+            vector_store_id = activity_data.get('vector_store_id')
+            logger.info(f"GPT model - Vector Store: {vector_store_id}")
+
+            try:
+                language_code = cl.user_session.get("language", "en")
+                system_prompt_content = build_system_prompt(activity_data, logger, language_code)
+
+                messages_history_data = await api_get_messages_for_thread(thread_id)
+                openai_input = []
+                for msg_data in messages_history_data:
+                    openai_role = msg_data['role'] if msg_data['role'] in ["assistant", "user"] else "user"
+                    openai_input.append({"role": openai_role, "content": msg_data['content']})
+
+                tools = []
+                if vector_store_id:
+                    tools.append({"type": "file_search", "vector_store_ids": [vector_store_id]})
+
+                response = await openai_client.responses.create(
                     model=openai_settings["model"],
-                    messages=openai_messages,
+                    instructions=system_prompt_content,
+                    input=openai_input,
+                    tools=tools,
                     temperature=openai_settings["temperature"],
                 )
-                ai_response_content = response.choices[0].message.content
-                
+                ai_response_content = response.output_text
+                if not ai_response_content:
+                    logger.error(f"OpenAI returned an empty response (status: {response.status})")
+                    thinking_msg.content = "I apologize, but I couldn't generate a response. Please try again."
+                    await thinking_msg.update()
+                    return
+
                 await api_create_message(thread_id, ai_response_content, "assistant", user_id, model_name=openai_settings["model"])
                 thinking_msg.content = ai_response_content
                 await thinking_msg.update()
-                logger.info("Legacy chat completion response sent successfully")
+                logger.info(f"OpenAI response sent successfully (file_search: {bool(tools)})")
+
+            except Exception as e:
+                logger.error(f"OpenAI Error: {e}")
+                thinking_msg.content = f"I apologize, but I'm having trouble processing your request right now. Please try again in a moment. Error: {str(e)}"
+                await thinking_msg.update()
         
     except Exception as e:
         logger.error(f"Error processing message: {e}")
