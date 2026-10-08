@@ -16,3 +16,4 @@ class Migration(migrations.Migration):
             field=models.CharField(choices=[('gpt', 'GPT'), ('mistral', 'Mistral')], default='mistral', max_length=20),
         ),
     ]
+

@@ -2670,3 +2670,4 @@ def admin_delete_activity(request, user_id: str, activity_id: str):
 
 # Register admin router
 api.add_router("/admin", admin_router)
+

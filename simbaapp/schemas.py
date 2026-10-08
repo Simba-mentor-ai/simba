@@ -297,3 +297,4 @@ class ActivityFileSchema(Schema):
 
 class ActivityFilesResponseSchema(Schema):
     files: List[ActivityFileSchema]
+
