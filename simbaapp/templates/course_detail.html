@@ -494,15 +494,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const backToActivitiesBtn = document.getElementById('back-to-activities');
     
     // Function to force complete iframe reload (clears Chainlit session)
-    function forceChainlitReload() {
+    function forceChainlitReload(sessionId) {
         console.log('Reloading Chainlit iframe');
-        
+
         // First clear the iframe
         chainlitFrame.src = 'about:blank';
-        
-        // Wait a moment then load the base URL
+
+        // Wait a moment then load the chat with this student's session id: Chainlit fetches exactly that
+        // session, instead of the oldest waiting one, which could belong to another student.
+        // Also as a short-lived cookie: on the live site (chat under /chainlit/) the ?session= part of the
+        // address does not reach Chainlit, but the browser sends this cookie with the chat's connection.
+        document.cookie = 'simba_chat_session=' + encodeURIComponent(sessionId) + '; path=/; max-age=3600; SameSite=Lax'
+            + (location.protocol === 'https:' ? '; Secure' : '');
+        const chatUrl = '{{ chainlit_url }}';
         setTimeout(() => {
-            chainlitFrame.src = '{{ chainlit_url }}';
+            chainlitFrame.src = chatUrl + (chatUrl.includes('?') ? '&' : '?') + 'session=' + encodeURIComponent(sessionId);
         }, 200);
     }
     
@@ -540,8 +546,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const sessionData = await response.json();
             console.log('Session created successfully:', sessionData);
             
-            // Load Chainlit iframe with base URL (no parameters)
-            forceChainlitReload();
+            // Load Chainlit iframe with this session's id
+            forceChainlitReload(sessionData.session_id);
             
         } catch (error) {
             console.error('Error creating session:', error);
@@ -923,6 +929,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         form.querySelector('#agent-attitude').value = activity.agent_attitude;
                         form.querySelector('#ai-model').value = activity.ai_model || 'gpt';
+                        if (activity.llm_model) {
+                            form.querySelector('#together-model').value = activity.llm_model;
+                        }
+                        window.syncTogetherModelField(form);
+                        form.querySelector('#ai-model').addEventListener('change', () => window.syncTogetherModelField(form));
                         form.querySelector('#subjects').value = activity.subjects || '';
                         form.querySelector('#restrict-to-subject').checked = activity.restrict_to_subject;
                         form.querySelector('#allow-questions').checked = activity.allow_questions;
@@ -945,6 +956,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 questions: form.querySelector('#questions-hidden').value ? JSON.parse(form.querySelector('#questions-hidden').value) : [],
                                 agent_attitude: form.querySelector('#agent-attitude').value,
                                 ai_model: form.querySelector('#ai-model').value,
+                                llm_model: form.querySelector('#together-model').value,
                                 subjects: form.querySelector('#subjects').value,
                                 restrict_to_subject: form.querySelector('#restrict-to-subject').checked,
                                 allow_questions: form.querySelector('#allow-questions').checked,

@@ -5,67 +5,116 @@ echo "Starting application initialization..."
 
 python manage.py migrate
 
-echo "Checking if default teacher exists..."
+echo "Setting up the default admin and student accounts..."
 python -c "
 import os
+import sys
+import secrets
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'simba.settings')
 import django
 django.setup()
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password, check_password
 from simbaapp.models import User, Course, Activity, CourseEnrollment
 from django.utils import timezone
 
-# Check if user already exists
-if not User.objects.filter(username='prof').exists():
-    # Create a new teacher user (without role field)
-    password = 'prof'
-    password_hash = make_password(password)
-    
-    teacher = User.objects.create(
-        username='prof',
-        email='prof@gmail.com',
-        password_hash=password_hash,
-        is_email_verified=True,
-        email_verified_at=timezone.now(),
-        is_admin=True
-    )
-    print('Default teacher user created successfully (email verified, admin privileges)')
-else:
-    teacher = User.objects.get(username='prof')
-    # Ensure existing teacher is verified and admin
-    if not teacher.is_email_verified or not teacher.is_admin:
-        teacher.is_email_verified = True
-        teacher.email_verified_at = timezone.now()
-        teacher.is_admin = True
-        teacher.save()
-        print('Default teacher user verified and granted admin privileges')
-    else:
-        print('Default teacher user already exists, verified, and has admin privileges')
+# The admin (teacher) and student accounts come from .env: SIMBA_ADMIN_USERNAME/_EMAIL/_PASSWORD
+# and SIMBA_STUDENT_USERNAME/_EMAIL/_PASSWORD. They are applied on every start, so .env is the
+# source of truth. Development falls back to prof/prof and student/student. Production has no
+# fallback: an account with missing or weak settings is not created (deploy.sh refuses to deploy
+# in that case; this is the safety net for restarts). Keep these rules in sync with deploy.sh.
+is_production = os.getenv('ENVIRONMENT') == 'production'
 
-# Check if default student exists
-if not User.objects.filter(username='student').exists():
-    # Create a new student user (without role field)
-    password = 'student'
-    password_hash = make_password(password)
-    
-    student = User.objects.create(
-        username='student',
-        email='student@gmail.com',
-        password_hash=password_hash,
-        is_email_verified=True,
-        email_verified_at=timezone.now()
-    )
-    print('Default student user created successfully (email verified)')
-else:
-    student = User.objects.get(username='student')
-    # Ensure existing student is verified
-    if not student.is_email_verified:
-        student.is_email_verified = True
-        student.email_verified_at = timezone.now()
-        student.save()
-        print('Default student user verified')
+def account_settings(prefix, default_name):
+    if is_production:
+        defaults = ('', '', '')
     else:
-        print('Default student user already exists and verified')
+        defaults = (default_name, default_name + '@gmail.com', default_name)
+    username = os.getenv(prefix + '_USERNAME') or defaults[0]
+    email = os.getenv(prefix + '_EMAIL') or defaults[1]
+    password = os.getenv(prefix + '_PASSWORD') or defaults[2]
+    if is_production:
+        if not (username and email and password):
+            print(f'WARNING: {prefix}_USERNAME, _EMAIL and _PASSWORD are not all set, account not created or updated')
+            return None
+        if '@' not in email:
+            print(f'WARNING: {prefix}_EMAIL is not an email address, account not created or updated')
+            return None
+        if len(password) < 12 or password.lower() == username.lower():
+            print(f'WARNING: {prefix}_PASSWORD is too weak (under 12 characters or same as the username), account not created or updated')
+            return None
+    return username, email, password
+
+def ensure_account(settings, is_admin):
+    if settings is None:
+        return None
+    username, email, password = settings
+    user = User.objects.filter(username=username).first()
+    email_taken = User.objects.filter(email=email).exclude(username=username).exists()
+    if user is None:
+        if email_taken:
+            print(f'WARNING: {email} already belongs to another account, {username} not created')
+            return None
+        user = User.objects.create(
+            username=username,
+            email=email,
+            password_hash=make_password(password),
+            is_email_verified=True,
+            email_verified_at=timezone.now(),
+            is_admin=is_admin
+        )
+        print(f'Account {username} created (email verified, admin={is_admin})')
+        return user
+    changed = []
+    if user.email != email:
+        if email_taken:
+            print(f'WARNING: {email} already belongs to another account, {username} keeps its current email')
+        else:
+            user.email = email
+            changed.append('email')
+    if not check_password(password, user.password_hash):
+        user.password_hash = make_password(password)
+        changed.append('password')
+    if not user.is_email_verified:
+        user.is_email_verified = True
+        user.email_verified_at = timezone.now()
+        changed.append('email verified')
+    if is_admin and not user.is_admin:
+        user.is_admin = True
+        changed.append('admin')
+    if changed:
+        user.save()
+        print(f'Account {username} updated: ' + ', '.join(changed))
+    else:
+        print(f'Account {username} already up to date')
+    return user
+
+admin_settings = account_settings('SIMBA_ADMIN', 'prof')
+student_settings = account_settings('SIMBA_STUDENT', 'student')
+teacher = ensure_account(admin_settings, is_admin=True)
+student = ensure_account(student_settings, is_admin=False)
+
+# Older versions created prof/prof and student/student on every server. In production, lock any
+# of them that still has its default password: random password, and an email nobody can receive,
+# so the password-reset link can't be used either.
+if is_production:
+    configured = {s[0] for s in (admin_settings, student_settings) if s}
+    for old_name in ('prof', 'student'):
+        if old_name in configured:
+            continue
+        old = User.objects.filter(username=old_name).first()
+        if old and check_password(old_name, old.password_hash):
+            old.password_hash = make_password(secrets.token_urlsafe(32))
+            old.email = old_name + '-locked@simba.invalid'
+            old.save()
+            print(f'Locked the old default account {old_name} (it still had its default password)')
+
+# The demo courses and conversations below are for development only
+if is_production:
+    print('Production: demo courses and conversations are not created')
+    sys.exit(0)
+if teacher is None or student is None:
+    print('Default accounts missing, demo courses and conversations not created')
+    sys.exit(0)
 
 # Create default course by teacher if it doesn't exist
 if not Course.objects.filter(title='Thermodynamics Course').exists():

@@ -59,7 +59,6 @@ from .eventTracking import (
     deletedCourse,
     joinedActivity,
     joinedCourse,
-    loggedIn,
     loggedOut,
     modifiedActivity,
     modifiedCourse,
@@ -69,6 +68,7 @@ from .eventTracking import (
     sentMessage 
 )
 from .email_utils import send_email_verification, send_password_reset_email
+from .services import authenticate_user
 import time
 import logging
 
@@ -78,6 +78,7 @@ from . import cluster_students
 from . import openai_assistant
 from . import cognitive_classifier
 from . import cognitive_scores
+from .llm_models import resolve_together_model
 from .templates import build_system_prompt
 
 # Configure logging
@@ -131,27 +132,9 @@ def register_user(request, payload: UserRegisterSchema):
 def login_user(request, payload: SignInSchema):
     """
     Authenticate a user and return user details.
+    The login page calls services.authenticate_user directly; this endpoint stays for other callers.
     """
-    try:
-        user = User.objects.get(username=payload.username)
-        if check_password(payload.password, user.password_hash):
-            if not user.is_email_verified:
-                return HTTPStatus.UNAUTHORIZED, {"message": "Please verify your email address before logging in."}
-            
-            loggedIn(user, time.time())
-            
-            user_data = {
-                "id": str(user.id),
-                "username": user.username,
-                "email": user.email
-            }
-            return HTTPStatus.OK, user_data
-        else:
-            return HTTPStatus.UNAUTHORIZED, {"message": "Invalid credentials."}
-    except User.DoesNotExist:
-        return HTTPStatus.NOT_FOUND, {"message": "User does not exist."}
-    except Exception as e:
-         return HTTPStatus.INTERNAL_SERVER_ERROR, {"message": f"Login failed: {str(e)}"}
+    return authenticate_user(payload.username, payload.password)
 
 @api.post("/auth/verify-email", response={200: dict, 400: ErrorSchema, 404: ErrorSchema})
 def verify_email(request, payload: EmailVerificationSchema):
@@ -415,9 +398,6 @@ def create_activity_api(request, payload: ActivityCreateSchema, user_id: str):
             options['word_limit'] = payload.word_limit
         
 
-        assistant_id = None
-        vector_store_id = None
-
         activity = Activity.objects.create(
             course=course,
             owner=user,
@@ -430,8 +410,7 @@ def create_activity_api(request, payload: ActivityCreateSchema, user_id: str):
             is_visible=payload.is_visible,
             allow_redo=payload.allow_redo,
             ai_model=payload.ai_model,
-            openai_assistant_id=assistant_id,
-            vector_store_id=vector_store_id,
+            llm_model=resolve_together_model(payload.llm_model) if payload.ai_model == 'together' else None,
             options=options
         )
 
@@ -482,19 +461,20 @@ def create_activity_api(request, payload: ActivityCreateSchema, user_id: str):
                         logger.error(f"Invalid file format at index {i}: {file_base64[:100]}...")
                         return HTTPStatus.BAD_REQUEST, {"message": f"Invalid file format at position {i+1}. Expected 'filename:content_type:base64_content'"}
             
-            logger.info(f"Creating OpenAI assistant for activity with {len(files_to_upload)} files")
-            assistant_result = openai_assistant.create_assistant(activity_data, files_to_upload, user_language)
+            logger.info(f"Uploading {len(files_to_upload)} documents for GPT activity")
+            documents_result = openai_assistant.create_activity_documents(activity_data, files_to_upload)
             
-            if not assistant_result['success']:
-                error_msg = assistant_result.get('error', 'Unknown error')
-                logger.error(f"Failed to create OpenAI assistant: {error_msg}")
-                return HTTPStatus.BAD_REQUEST, {"message": f"Failed to create OpenAI assistant: {error_msg}"}
+            if not documents_result['success']:
+                error_msg = documents_result.get('error', 'Unknown error')
+                logger.error(f"Failed to upload activity documents: {error_msg}")
+                # The row was created above; don't leave a GPT activity without its documents
+                activity.delete()
+                return HTTPStatus.BAD_REQUEST, {"message": f"Failed to upload activity documents: {error_msg}"}
 
-            assistant_id = assistant_result['assistant_id']
-            vector_store_id = assistant_result['vector_store_id']
-            logger.info(f"Successfully created OpenAI assistant: {assistant_id}, vector_store: {vector_store_id}")
+            activity.vector_store_id = documents_result['vector_store_id']
+            logger.info(f"Activity documents ready, vector_store: {activity.vector_store_id}")
         else:
-            logger.info(f"Creating activity with {payload.ai_model} model - no OpenAI assistant needed")
+            logger.info(f"Creating activity with {payload.ai_model} model - no OpenAI documents needed")
         
         activity.save()
 
@@ -510,6 +490,7 @@ def create_activity_api(request, payload: ActivityCreateSchema, user_id: str):
             "is_visible": payload.is_visible,
             "allow_redo": payload.allow_redo,
             "ai_model": payload.ai_model,
+            "llm_model": activity.llm_model,
             "options": options
         }, time.time())
         
@@ -553,6 +534,10 @@ def update_activity_api(request, activity_id: str, payload: ActivityUpdateSchema
             activity.allow_redo = payload.allow_redo
         if payload.ai_model is not None:
             activity.ai_model = payload.ai_model
+        if activity.ai_model == 'together':
+            activity.llm_model = resolve_together_model(payload.llm_model or activity.llm_model)
+        else:
+            activity.llm_model = None
 
         current_options = activity.get_all_options()
         
@@ -626,30 +611,24 @@ def update_activity_api(request, activity_id: str, payload: ActivityUpdateSchema
                     except ValueError:
                         return HTTPStatus.BAD_REQUEST, {"message": "Invalid file format. Expected 'filename:content_type:base64_content'"}
             
-            if activity.openai_assistant_id:
-                assistant_result = openai_assistant.update_assistant(
-                    activity.openai_assistant_id, 
-                    activity_data, 
-                    files_to_upload
-                )
-            else:
-                assistant_result = openai_assistant.create_assistant(activity_data, files_to_upload, user_language)
+            documents_result = openai_assistant.add_activity_documents(
+                activity.vector_store_id,
+                activity_data,
+                files_to_upload
+            )
             
-            if not assistant_result['success']:
-                return HTTPStatus.BAD_REQUEST, {"message": f"Failed to update OpenAI assistant: {assistant_result.get('error', 'Unknown error')}"}
+            if not documents_result['success']:
+                return HTTPStatus.BAD_REQUEST, {"message": f"Failed to upload activity documents: {documents_result.get('error', 'Unknown error')}"}
             
-            activity.openai_assistant_id = assistant_result['assistant_id']
-            activity.vector_store_id = assistant_result['vector_store_id']
+            activity.vector_store_id = documents_result['vector_store_id']
+            # Assistants API is shut down; the ID of a legacy assistant is no longer used
+            activity.openai_assistant_id = None
             
-        elif previous_ai_model == 'gpt' and activity.ai_model == 'mistral':
-            if activity.openai_assistant_id:
-                try:
-                    openai_assistant.delete_assistant(activity.openai_assistant_id, activity.vector_store_id)
-                except Exception as e:
-                    logger.warning(f"Failed to clean up OpenAI assistant {activity.openai_assistant_id}: {e}")
-                
-                activity.openai_assistant_id = None
-                activity.vector_store_id = None
+        elif previous_ai_model == 'gpt' and activity.ai_model != 'gpt':
+            if activity.vector_store_id:
+                openai_assistant.delete_activity_documents(activity.vector_store_id)
+            activity.openai_assistant_id = None
+            activity.vector_store_id = None
         
         activity.save()
         
@@ -658,6 +637,7 @@ def update_activity_api(request, activity_id: str, payload: ActivityUpdateSchema
             "description": activity.description, 
             "owner": user.id, 
             "ai_model": activity.ai_model,
+            "llm_model": activity.llm_model,
             "options": updated_options
         }, time.time())
         
@@ -681,6 +661,8 @@ def delete_activity_api(request, activity_id: str, user_id: str):
         if activity.owner_id != user.id and activity.course.owner_id != user.id:
             return HTTPStatus.FORBIDDEN, {"message": "Only the activity owner or course owner can delete this activity."}
         
+        if activity.vector_store_id:
+            openai_assistant.delete_activity_documents(activity.vector_store_id)
         activity.delete()
         deletedActivity(user,activity_id,time.time())
         return HTTPStatus.NO_CONTENT, None
@@ -1750,6 +1732,7 @@ def create_chainlit_session(request, payload: ChainlitSessionInitSchema):
             'trust_document': all_options.get('trust_document', True),
             'word_limit': all_options.get('word_limit', 0),
             'ai_model': activity.ai_model,
+            'llm_model': activity.llm_model,
             'openai_assistant_id': activity.openai_assistant_id,
             'vector_store_id': activity.vector_store_id,
             'course': {
@@ -1883,6 +1866,7 @@ def init_chainlit_session(request, payload: ChainlitSessionInitSchema):
             'trust_document': all_options.get('trust_document', True),
             'word_limit': all_options.get('word_limit', 0),
             'ai_model': activity.ai_model,
+            'llm_model': activity.llm_model,
             'openai_assistant_id': activity.openai_assistant_id,
             'vector_store_id': activity.vector_store_id,
             'course': {
@@ -1951,7 +1935,13 @@ def get_chainlit_session(request, session_id: str):
             session_id=session_id,
             expires_at__gt=timezone.now()
         )
-        
+
+        # Taken by its own chat window: make sure /next-session never hands it to another student.
+        # It can still be fetched again by id (e.g. when the chat window reloads) until it expires.
+        if not chainlit_session.is_consumed:
+            chainlit_session.is_consumed = True
+            chainlit_session.save(update_fields=['is_consumed'])
+
         return HTTPStatus.OK, chainlit_session.session_data
         
     except ChainlitSession.DoesNotExist:
@@ -2645,17 +2635,9 @@ def admin_delete_activity(request, user_id: str, activity_id: str):
         
         activity = Activity.objects.get(id=activity_id)
         
-        # Clean up OpenAI resources if they exist
-        try:
-            from simbaapp.openai_assistant import OpenAIAssistant
-            if activity.openai_assistant_id:
-                openai_assistant = OpenAIAssistant()
-                openai_assistant.delete_assistant(activity.openai_assistant_id)
-                if activity.vector_store_id:
-                    openai_assistant.delete_vector_store(activity.vector_store_id)
-        except Exception as cleanup_error:
-            # Log the error but don't fail the deletion
-            print(f"Warning: Failed to clean up OpenAI resources for activity {activity_id}: {cleanup_error}")
+        # Clean up OpenAI documents if they exist (failures are logged, not raised)
+        if activity.vector_store_id:
+            openai_assistant.delete_activity_documents(activity.vector_store_id)
         
         activity.delete()
         deletedActivity(admin, activity_id, time.time())
