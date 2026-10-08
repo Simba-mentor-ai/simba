@@ -427,4 +427,4 @@ def upload_file_to_assistant(vector_store_id: str, file_data: Dict[str, Any]) ->
         return {
             'success': False,
             'error': str(e)
-        }
+        } 

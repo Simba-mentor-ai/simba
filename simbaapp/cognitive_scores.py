@@ -52,8 +52,10 @@ def se_status(v):
 
 
 def pq_status(v):
-    if v is None or v == 0:
-        return WARN, "Aucune reformulation"
+    if v is None:
+        return WARN, "Pas encore de données"
+    if v == 0:
+        return BAD, "Aucune reformulation"
     if v < 0.05:
         return WARN, "Reformulation rare"
     return GOOD, "Itération stratégique"

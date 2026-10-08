@@ -197,3 +197,7 @@ id_rsa.pub
 # Mac / Windows system files
 .DS_Store
 Thumbs.db
+
+# Student account lists and the account-creation script: personal data / shared password, never commit
+*.csv
+bulk_create_accounts.py
